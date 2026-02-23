@@ -37,3 +37,28 @@ def _find_first_existing_column(df: pd.DataFrame, candidates: List[str]) -> Opti
         if matched:
             return matched
     return None
+
+
+def _default_positive_classes(target_col: str, options: List[str]) -> List[str]:
+    lowered = [opt.lower() for opt in options]
+    if "engagement" in target_col.lower() and "low" in lowered:
+        return [options[lowered.index("low")]]
+
+    tokens = ["churn", "yes", "true", "1", "left", "at_risk", "low"]
+    matches = [opt for opt in options if any(token in opt.lower() for token in tokens)]
+    if matches:
+        return [matches[0]]
+
+    return [options[0]] if options else []
+
+
+def _risk_bucket(probability: float) -> str:
+    if probability <= 0.30:
+        return "Low"
+    if probability <= 0.70:
+        return "Medium"
+    return "High"
+
+
+def _risk_color(risk_level: str) -> str:
+    return {"Low": "#22c55e", "Medium": "#f59e0b", "High": "#ef4444"}.get(risk_level, "#60a5fa")
