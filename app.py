@@ -432,3 +432,52 @@ def _risk_distribution_plots(probability_frame: pd.DataFrame) -> plt.Figure:
 
     figure.tight_layout()
     return figure
+
+
+def predict_single_player(
+    model: Pipeline,
+    player_input: Dict[str, object],
+    numeric_features: List[str],
+    categorical_features: List[str],
+    categorical_modes: Dict[str, object],
+) -> Dict[str, object]:
+    row = {}
+    for feature in numeric_features:
+        value = player_input.get(feature, np.nan)
+        row[feature] = pd.to_numeric(value, errors="coerce")
+
+    for feature in categorical_features:
+        value = player_input.get(feature, categorical_modes.get(feature, "Unknown"))
+        row[feature] = value if pd.notna(value) and str(value).strip() else categorical_modes.get(feature, "Unknown")
+
+    player_frame = pd.DataFrame([row])
+
+    if hasattr(model, "predict_proba"):
+        churn_probability = float(model.predict_proba(player_frame)[:, 1][0])
+    elif hasattr(model, "decision_function"):
+        decision_value = float(model.decision_function(player_frame)[0])
+        churn_probability = 1.0 / (1.0 + np.exp(-decision_value))
+    else:
+        churn_probability = float(model.predict(player_frame)[0])
+
+    risk_level = _risk_bucket(churn_probability)
+
+    return {
+        "churn_probability": churn_probability,
+        "risk_level": risk_level,
+        "risk_color": _risk_color(risk_level),
+        "prediction_label": int(churn_probability >= 0.5),
+    }
+
+
+def _render_risk_badge(risk_level: str, probability: float) -> None:
+    color = _risk_color(risk_level)
+    st.markdown(
+        f"""
+        <div style="padding:0.65rem 0.9rem;border-radius:0.6rem;background:{color}22;border:1px solid {color};display:inline-block;">
+            <span style="font-weight:700;color:{color};">{risk_level} Risk</span>
+            <span style="margin-left:0.55rem;color:#111827;">{probability:.1%} churn probability</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
