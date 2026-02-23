@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
+from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
@@ -229,3 +230,44 @@ def _initialize_target_state(df: pd.DataFrame) -> None:
         st.session_state["positive_classes"] = default_positive
     elif "positive_classes" not in st.session_state:
         st.session_state["positive_classes"] = default_positive
+
+
+def train_models(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    preprocessor: ColumnTransformer,
+    is_imbalanced: bool = False,
+) -> Dict[str, Pipeline]:
+    class_weight = "balanced" if is_imbalanced else None
+
+    estimators = {
+        "Logistic Regression": LogisticRegression(
+            max_iter=1000,
+            random_state=RANDOM_STATE,
+            class_weight=class_weight,
+        ),
+        "Random Forest": RandomForestClassifier(
+            n_estimators=300,
+            random_state=RANDOM_STATE,
+            class_weight=class_weight,
+            n_jobs=-1,
+        ),
+        "Decision Tree": DecisionTreeClassifier(
+            random_state=RANDOM_STATE,
+            class_weight=class_weight,
+            min_samples_leaf=5,
+        ),
+    }
+
+    trained = {}
+    for name, estimator in estimators.items():
+        pipeline = Pipeline(
+            steps=[
+                ("preprocessor", clone(preprocessor)),
+                ("model", estimator),
+            ]
+        )
+        pipeline.fit(X_train, y_train)
+        trained[name] = pipeline
+
+    return trained
