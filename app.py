@@ -738,6 +738,112 @@ def main() -> None:
         )
         st.dataframe(importance_df, use_container_width=True)
     elif section == "Player Risk Analysis":
-        st.info("Player Risk Analysis section coming next.")
+        st.subheader("Player Risk Analysis")
+        if "trained_models" not in st.session_state:
+            st.info("Train models first from the Model Training section.")
+            return
+
+        models = st.session_state["trained_models"]
+        bundle = st.session_state["data_bundle"]
+
+        selected_model_name = st.selectbox("Model for prediction", options=list(models.keys()))
+        selected_model = models[selected_model_name]
+
+        st.write("Existing Player Predictor")
+        row_index = st.selectbox("Select player row index", options=bundle["X_model"].index.tolist())
+        st.dataframe(bundle["X_display"].loc[[row_index]], use_container_width=True)
+
+        if st.button("Predict Selected Player", use_container_width=True):
+            selected_row = bundle["X_model"].loc[[row_index]]
+            probability = float(selected_model.predict_proba(selected_row)[0, 1])
+            risk = _risk_bucket(probability)
+            st.metric("Churn Probability", f"{probability:.4f}")
+            st.markdown(
+                f"<div style='font-size:1.05rem;font-weight:700;color:{_risk_color(risk)};'>Risk Level: {risk}</div>",
+                unsafe_allow_html=True,
+            )
+
+        st.write("Single Player Simulator")
+        numeric_features = bundle["numeric_features"]
+        x_model = bundle["X_model"]
+
+        if not numeric_features:
+            st.warning("No numeric features available for simulator inputs.")
+            return
+
+        input_values = {}
+        input_cols = st.columns(3)
+        for idx, feature in enumerate(numeric_features):
+            default_value = float(pd.to_numeric(x_model[feature], errors="coerce").median())
+            with input_cols[idx % 3]:
+                input_values[feature] = st.number_input(
+                    feature,
+                    value=default_value if not np.isnan(default_value) else 0.0,
+                    key=f"sim_{feature}",
+                )
+
+        simulator_row = {}
+        for feature in x_model.columns:
+            if feature in input_values:
+                simulator_row[feature] = input_values[feature]
+            elif feature in bundle["categorical_modes"]:
+                simulator_row[feature] = bundle["categorical_modes"][feature]
+            else:
+                simulator_row[feature] = 0
+
+        simulator_df = pd.DataFrame([simulator_row], columns=x_model.columns)
+        sim_probability = float(selected_model.predict_proba(simulator_df)[0, 1])
+        sim_risk = _risk_bucket(sim_probability)
+
+        sim_col_1, sim_col_2 = st.columns([1, 2])
+        with sim_col_1:
+            st.metric("Simulated Churn Probability", f"{sim_probability:.4f}")
+        with sim_col_2:
+            st.markdown(
+                f"<div style='font-size:1.05rem;font-weight:700;color:{_risk_color(sim_risk)};'>Risk Level: {sim_risk}</div>",
+                unsafe_allow_html=True,
+            )
     elif section == "Decision Tree Explorer":
-        st.info("Decision Tree Explorer section coming next.")
+        st.subheader("Decision Tree Explorer")
+        if "trained_models" not in st.session_state:
+            st.info("Train models first from the Model Training section.")
+            return
+
+        dt_pipeline = st.session_state["trained_models"]["Decision Tree"]
+        dt_model = dt_pipeline.named_steps["model"]
+
+        max_tree_depth = max(1, dt_model.get_depth())
+        view_depth = st.slider(
+            "Display tree depth",
+            min_value=1,
+            max_value=max_tree_depth,
+            value=min(3, max_tree_depth),
+        )
+
+        preprocessor = dt_pipeline.named_steps["preprocessor"]
+        feature_names = list(preprocessor.get_feature_names_out())
+
+        fig, ax = plt.subplots(figsize=(20, 10))
+        plot_tree(
+            dt_model,
+            feature_names=feature_names,
+            class_names=["Non-Churn", "Churn"],
+            filled=True,
+            rounded=True,
+            max_depth=view_depth,
+            impurity=False,
+            proportion=True,
+            fontsize=8,
+            ax=ax,
+        )
+        ax.set_title("Decision Tree Explorer")
+        plt.tight_layout()
+        st.pyplot(fig)
+
+        split_text = export_text(dt_model, feature_names=feature_names, max_depth=view_depth)
+        st.markdown("**Decision Tree feature splits**")
+        st.code(split_text)
+
+
+if __name__ == "__main__":
+    main()
