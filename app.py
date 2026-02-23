@@ -500,9 +500,43 @@ def main() -> None:
             "Decision Tree Explorer",
         ],
     )
+    uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+
+    df = None
+    if uploaded_file is not None:
+        try:
+            df = load_data(uploaded_file)
+            st.session_state["raw_df"] = df
+        except Exception as exc:
+            st.error(f"Failed to read uploaded file: {exc}")
+            return
+    elif "raw_df" in st.session_state:
+        df = st.session_state["raw_df"]
 
     if section == "Upload Data":
-        st.info("Upload Data section coming next.")
+        st.subheader("Data Overview")
+        if df is None:
+            st.info("Upload a CSV file from the sidebar to begin.")
+            return
+
+        if df.empty:
+            st.error("The uploaded CSV is empty.")
+            return
+
+        st.write("Raw Dataset Preview")
+        st.dataframe(df.head(20), use_container_width=True)
+
+        shape_col_1, shape_col_2 = st.columns(2)
+        shape_col_1.metric("Rows", f"{df.shape[0]:,}")
+        shape_col_2.metric("Columns", f"{df.shape[1]:,}")
+
+        target_col = _find_column_case_insensitive(df, "Churn")
+        if target_col is None:
+            target_col = df.columns[-1]
+
+        class_dist = df[target_col].astype(str).value_counts(dropna=False).rename_axis("Class").reset_index(name="Count")
+        st.write(f"Class Distribution (`{target_col}`)")
+        st.dataframe(class_dist, use_container_width=True)
     elif section == "Model Training":
         st.info("Model Training section coming next.")
     elif section == "Model Evaluation":
