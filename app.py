@@ -24,3 +24,16 @@ from sklearn.tree import DecisionTreeClassifier, export_text, plot_tree
 
 warnings.filterwarnings("ignore")
 RANDOM_STATE = 42
+
+
+def _find_column_case_insensitive(df: pd.DataFrame, target_name: str) -> Optional[str]:
+    lookup = {col.lower(): col for col in df.columns}
+    return lookup.get(target_name.lower())
+
+
+def _find_first_existing_column(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
+    for name in candidates:
+        matched = _find_column_case_insensitive(df, name)
+        if matched:
+            return matched
+    return None
