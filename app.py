@@ -381,3 +381,54 @@ def _top_driver_notes(importance_df: pd.DataFrame, top_n: int = 3) -> List[str]:
         share = (float(row["importance"]) / total) * 100
         notes.append(f"{row['feature']} contributes approximately {share:.1f}% of model importance.")
     return notes
+
+
+def _build_probability_frame(
+    model: Pipeline,
+    X_model: pd.DataFrame,
+    X_display: pd.DataFrame,
+    y_true: pd.Series,
+    id_col: Optional[str] = None,
+) -> pd.DataFrame:
+    if hasattr(model, "predict_proba"):
+        churn_probability = model.predict_proba(X_model)[:, 1]
+    elif hasattr(model, "decision_function"):
+        decision = model.decision_function(X_model)
+        churn_probability = (decision - decision.min()) / (decision.max() - decision.min() + 1e-9)
+    else:
+        churn_probability = model.predict(X_model).astype(float)
+
+    probability_frame = pd.DataFrame(
+        {
+            "row_id": np.arange(len(X_model)),
+            "churn_probability": churn_probability,
+            "predicted_label": (churn_probability >= 0.50).astype(int),
+            "actual_label": y_true.values,
+        }
+    )
+    probability_frame["risk_level"] = probability_frame["churn_probability"].apply(_risk_bucket)
+
+    if id_col and id_col in X_display.columns:
+        probability_frame[id_col] = X_display[id_col].values
+
+    return probability_frame
+
+
+def _risk_distribution_plots(probability_frame: pd.DataFrame) -> plt.Figure:
+    figure, axes = plt.subplots(1, 2, figsize=(12, 4))
+
+    axes[0].hist(probability_frame["churn_probability"], bins=20, color="#0ea5e9", alpha=0.9)
+    axes[0].set_title("Churn Probability Distribution")
+    axes[0].set_xlabel("Predicted churn probability")
+    axes[0].set_ylabel("Players")
+    axes[0].axvline(0.30, color="#22c55e", linestyle="--", linewidth=1)
+    axes[0].axvline(0.70, color="#ef4444", linestyle="--", linewidth=1)
+
+    risk_counts = probability_frame["risk_level"].value_counts().reindex(["Low", "Medium", "High"], fill_value=0)
+    axes[1].bar(risk_counts.index, risk_counts.values, color=["#22c55e", "#f59e0b", "#ef4444"])
+    axes[1].set_title("Risk Bucket Distribution")
+    axes[1].set_xlabel("Risk level")
+    axes[1].set_ylabel("Players")
+
+    figure.tight_layout()
+    return figure
