@@ -271,3 +271,72 @@ def train_models(
         trained[name] = pipeline
 
     return trained
+
+
+def _plot_confusion_matrix(cm: np.ndarray, class_labels: Dict[int, str], title: str) -> plt.Figure:
+    figure, axis = plt.subplots(figsize=(5, 4))
+    image = axis.imshow(cm, interpolation="nearest", cmap=plt.cm.Blues)
+    figure.colorbar(image, ax=axis)
+
+    labels = [class_labels.get(0, "Class 0"), class_labels.get(1, "Class 1")]
+    axis.set(
+        xticks=np.arange(len(labels)),
+        yticks=np.arange(len(labels)),
+        xticklabels=labels,
+        yticklabels=labels,
+        ylabel="True label",
+        xlabel="Predicted label",
+        title=title,
+    )
+    plt.setp(axis.get_xticklabels(), rotation=20, ha="right", rotation_mode="anchor")
+
+    threshold = cm.max() / 2.0 if cm.size else 0
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            axis.text(
+                j,
+                i,
+                format(cm[i, j], "d"),
+                ha="center",
+                va="center",
+                color="white" if cm[i, j] > threshold else "black",
+            )
+    figure.tight_layout()
+    return figure
+
+
+def evaluate_model(
+    model_name: str,
+    model: Pipeline,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+    class_labels: Dict[int, str],
+) -> Dict[str, object]:
+    y_pred = model.predict(X_test)
+
+    if hasattr(model, "predict_proba"):
+        y_proba = model.predict_proba(X_test)[:, 1]
+    elif hasattr(model, "decision_function"):
+        decision = model.decision_function(X_test)
+        y_proba = (decision - decision.min()) / (decision.max() - decision.min() + 1e-9)
+    else:
+        y_proba = y_pred.astype(float)
+
+    metrics = {
+        "accuracy": accuracy_score(y_test, y_pred),
+        "precision": precision_score(y_test, y_pred, zero_division=0),
+        "recall": recall_score(y_test, y_pred, zero_division=0),
+        "f1": f1_score(y_test, y_pred, zero_division=0),
+        "roc_auc": roc_auc_score(y_test, y_proba) if y_test.nunique() > 1 else np.nan,
+    }
+
+    cm = confusion_matrix(y_test, y_pred, labels=[0, 1])
+    cm_figure = _plot_confusion_matrix(cm, class_labels, f"{model_name} Confusion Matrix")
+
+    return {
+        "metrics": metrics,
+        "confusion_matrix": cm,
+        "confusion_matrix_figure": cm_figure,
+        "predictions": y_pred,
+        "probabilities": y_proba,
+    }
