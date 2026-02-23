@@ -513,6 +513,9 @@ def main() -> None:
     elif "raw_df" in st.session_state:
         df = st.session_state["raw_df"]
 
+    if df is not None and not df.empty:
+        _initialize_target_state(df)
+
     if section == "Upload Data":
         st.subheader("Data Overview")
         if df is None:
@@ -538,7 +541,90 @@ def main() -> None:
         st.write(f"Class Distribution (`{target_col}`)")
         st.dataframe(class_dist, use_container_width=True)
     elif section == "Model Training":
-        st.info("Model Training section coming next.")
+        st.subheader("Model Training")
+        if df is None:
+            st.info("Upload data first in the sidebar.")
+            return
+
+        test_size = st.slider(
+            "Train/Test split (test proportion)",
+            min_value=0.10,
+            max_value=0.40,
+            value=0.20,
+            step=0.05,
+        )
+        depth_slider = st.slider(
+            "Decision Tree max depth (0 = no limit)",
+            min_value=0,
+            max_value=20,
+            value=6,
+        )
+        dt_max_depth = None if depth_slider == 0 else depth_slider
+
+        if st.button("Train Model", type="primary", use_container_width=True):
+            try:
+                bundle = preprocess_data(
+                    df,
+                    st.session_state["target_col"],
+                    positive_classes=st.session_state.get("positive_classes", []),
+                )
+
+                x_model = bundle["X_model"]
+                y = bundle["y"]
+                preprocessor = bundle["preprocessor"]
+                class_weight = "balanced" if bundle["is_imbalanced"] else None
+
+                stratify_y = y if y.value_counts().min() >= 2 else None
+                x_train, x_test, y_train, y_test = train_test_split(
+                    x_model,
+                    y,
+                    test_size=test_size,
+                    random_state=RANDOM_STATE,
+                    stratify=stratify_y,
+                )
+
+                decision_tree = Pipeline(
+                    steps=[
+                        ("preprocessor", preprocessor),
+                        (
+                            "model",
+                            DecisionTreeClassifier(
+                                random_state=RANDOM_STATE,
+                                class_weight=class_weight,
+                                max_depth=dt_max_depth,
+                                min_samples_leaf=2,
+                            ),
+                        ),
+                    ]
+                )
+                decision_tree.fit(x_train, y_train)
+
+                y_pred = decision_tree.predict(x_test)
+                y_prob = decision_tree.predict_proba(x_test)[:, 1]
+                metrics = {
+                    "Accuracy": accuracy_score(y_test, y_pred),
+                    "Precision": precision_score(y_test, y_pred, zero_division=0),
+                    "Recall": recall_score(y_test, y_pred, zero_division=0),
+                    "F1": f1_score(y_test, y_pred, zero_division=0),
+                    "ROC-AUC": roc_auc_score(y_test, y_prob),
+                }
+
+                st.session_state["trained_models"] = {"Decision Tree": decision_tree}
+                st.session_state["model_metrics"] = {"Decision Tree": metrics}
+                st.session_state["confusion_matrices"] = {
+                    "Decision Tree": confusion_matrix(y_test, y_pred, labels=[0, 1])
+                }
+                st.session_state["data_bundle"] = bundle
+
+                st.success("Decision Tree training completed.")
+                metric_cols = st.columns(5)
+                metric_cols[0].metric("Accuracy", f"{metrics['Accuracy']:.4f}")
+                metric_cols[1].metric("Precision", f"{metrics['Precision']:.4f}")
+                metric_cols[2].metric("Recall", f"{metrics['Recall']:.4f}")
+                metric_cols[3].metric("F1", f"{metrics['F1']:.4f}")
+                metric_cols[4].metric("ROC-AUC", f"{metrics['ROC-AUC']:.4f}")
+            except Exception as exc:
+                st.error(f"Training failed: {exc}")
     elif section == "Model Evaluation":
         st.info("Model Evaluation section coming next.")
     elif section == "Player Risk Analysis":
