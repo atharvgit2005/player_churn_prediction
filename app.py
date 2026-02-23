@@ -340,3 +340,44 @@ def evaluate_model(
         "predictions": y_pred,
         "probabilities": y_proba,
     }
+
+
+def _rf_feature_importance_figure(model: Pipeline, top_n: int = 12) -> Tuple[Optional[plt.Figure], pd.DataFrame]:
+    estimator = model.named_steps.get("model")
+    if not isinstance(estimator, RandomForestClassifier) or not hasattr(estimator, "feature_importances_"):
+        return None, pd.DataFrame(columns=["feature", "importance"])
+
+    preprocessor = model.named_steps.get("preprocessor")
+    if hasattr(preprocessor, "get_feature_names_out"):
+        feature_names = [name.split("__", 1)[-1] for name in preprocessor.get_feature_names_out()]
+    else:
+        feature_names = [f"feature_{i}" for i in range(len(estimator.feature_importances_))]
+
+    importance_df = pd.DataFrame(
+        {
+            "feature": feature_names,
+            "importance": estimator.feature_importances_,
+        }
+    ).sort_values("importance", ascending=False)
+
+    top_df = importance_df.head(top_n).iloc[::-1]
+    figure, axis = plt.subplots(figsize=(8, 5))
+    axis.barh(top_df["feature"], top_df["importance"], color="#2563eb")
+    axis.set_title("Top Feature Importances (Random Forest)")
+    axis.set_xlabel("Importance")
+    axis.set_ylabel("Feature")
+    figure.tight_layout()
+
+    return figure, importance_df
+
+
+def _top_driver_notes(importance_df: pd.DataFrame, top_n: int = 3) -> List[str]:
+    if importance_df.empty:
+        return ["Feature importance is unavailable for the selected model."]
+
+    total = float(importance_df["importance"].sum()) or 1.0
+    notes = []
+    for _, row in importance_df.head(top_n).iterrows():
+        share = (float(row["importance"]) / total) * 100
+        notes.append(f"{row['feature']} contributes approximately {share:.1f}% of model importance.")
+    return notes
