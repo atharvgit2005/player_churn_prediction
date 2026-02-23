@@ -626,7 +626,117 @@ def main() -> None:
             except Exception as exc:
                 st.error(f"Training failed: {exc}")
     elif section == "Model Evaluation":
-        st.info("Model Evaluation section coming next.")
+        st.subheader("Model Evaluation")
+        if "trained_models" not in st.session_state:
+            st.info("Train models first from the Model Training section.")
+            return
+
+        metrics_map = st.session_state["model_metrics"]
+        models = st.session_state["trained_models"]
+        cm_map = st.session_state["confusion_matrices"]
+        bundle = st.session_state["data_bundle"]
+
+        comparison_df = pd.DataFrame(metrics_map).T
+        st.write("Model Comparison")
+        st.dataframe(comparison_df.round(4), use_container_width=True)
+
+        selected_model = st.selectbox("Detailed evaluation model", options=list(models.keys()))
+        selected_metrics = metrics_map[selected_model]
+
+        metric_cols = st.columns(5)
+        metric_cols[0].metric("Accuracy", f"{selected_metrics['Accuracy']:.4f}")
+        metric_cols[1].metric("Precision", f"{selected_metrics['Precision']:.4f}")
+        metric_cols[2].metric("Recall", f"{selected_metrics['Recall']:.4f}")
+        metric_cols[3].metric("F1", f"{selected_metrics['F1']:.4f}")
+        metric_cols[4].metric("ROC-AUC", f"{selected_metrics['ROC-AUC']:.4f}")
+
+        eval_left, eval_right = st.columns(2)
+        with eval_left:
+            cm = cm_map[selected_model]
+            cm_fig, cm_ax = plt.subplots(figsize=(4.5, 4))
+            im = cm_ax.imshow(cm, cmap="Blues")
+            cm_fig.colorbar(im, ax=cm_ax)
+            cm_ax.set_title(f"{selected_model} Confusion Matrix")
+            cm_ax.set_xlabel("Predicted")
+            cm_ax.set_ylabel("Actual")
+            cm_ax.set_xticks([0, 1])
+            cm_ax.set_yticks([0, 1])
+            for i in range(cm.shape[0]):
+                for j in range(cm.shape[1]):
+                    cm_ax.text(j, i, str(cm[i, j]), ha="center", va="center", color="black")
+            plt.tight_layout()
+            st.pyplot(cm_fig)
+
+        probabilities = models[selected_model].predict_proba(bundle["X_model"])[:, 1]
+        probability_frame = bundle["X_display"].copy()
+        probability_frame["churn_probability"] = probabilities
+        probability_frame["risk_level"] = probability_frame["churn_probability"].apply(_risk_bucket)
+
+        with eval_right:
+            hist_fig, hist_ax = plt.subplots(figsize=(6.5, 3.8))
+            hist_ax.hist(probability_frame["churn_probability"], bins=20, color="#0ea5e9", edgecolor="white")
+            hist_ax.set_title("Churn Probability Distribution")
+            hist_ax.set_xlabel("Probability")
+            hist_ax.set_ylabel("Count")
+            plt.tight_layout()
+            st.pyplot(hist_fig)
+
+            pie_fig, pie_ax = plt.subplots(figsize=(4.5, 4.5))
+            risk_counts = probability_frame["risk_level"].value_counts().reindex(["Low", "Medium", "High"], fill_value=0)
+            pie_ax.pie(
+                risk_counts.values,
+                labels=risk_counts.index,
+                autopct="%1.1f%%",
+                colors=["#22c55e", "#f59e0b", "#ef4444"],
+                startangle=90,
+            )
+            pie_ax.set_title("Risk Category Split")
+            pie_ax.axis("equal")
+            st.pyplot(pie_fig)
+
+        st.write("Interactive Risk Filter")
+        prob_range = st.slider(
+            "Churn probability range",
+            min_value=0.0,
+            max_value=1.0,
+            value=(0.0, 1.0),
+            step=0.01,
+        )
+
+        categorical_columns = bundle["X_display"].select_dtypes(exclude=[np.number]).columns.tolist()
+        filter_col = st.selectbox("Categorical filter feature", ["None"] + categorical_columns)
+
+        filter_value = None
+        if filter_col != "None":
+            values = sorted(probability_frame[filter_col].dropna().astype(str).unique().tolist())
+            filter_value = st.selectbox("Category value", values)
+
+        filtered = probability_frame[probability_frame["churn_probability"].between(prob_range[0], prob_range[1])]
+        if filter_col != "None" and filter_value is not None:
+            filtered = filtered[filtered[filter_col].astype(str) == filter_value]
+
+        st.write(f"Filtered players: **{len(filtered):,}**")
+        st.dataframe(filtered.sort_values("churn_probability", ascending=False).head(500), use_container_width=True)
+
+        csv_data = filtered.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download Risk Predictions CSV",
+            data=csv_data,
+            file_name="player_churn_risk_predictions.csv",
+            mime="text/csv",
+        )
+
+        st.write("Feature Interpretability")
+        tree_model = models[selected_model].named_steps["model"]
+        preprocessor = models[selected_model].named_steps["preprocessor"]
+        importances = tree_model.feature_importances_
+        feature_names = preprocessor.get_feature_names_out()
+        importance_df = (
+            pd.DataFrame({"feature": feature_names, "importance": importances})
+            .sort_values("importance", ascending=False)
+            .head(10)
+        )
+        st.dataframe(importance_df, use_container_width=True)
     elif section == "Player Risk Analysis":
         st.info("Player Risk Analysis section coming next.")
     elif section == "Decision Tree Explorer":
