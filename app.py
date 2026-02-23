@@ -231,7 +231,6 @@ def _initialize_target_state(df: pd.DataFrame) -> None:
     elif "positive_classes" not in st.session_state:
         st.session_state["positive_classes"] = default_positive
 
-
 def train_models(
     X_train: pd.DataFrame,
     y_train: pd.Series,
@@ -481,3 +480,34 @@ def _render_risk_badge(risk_level: str, probability: float) -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def main() -> None:
+    st.set_page_config(
+        page_title="Player Churn Dashboard",
+        page_icon="🎮",
+        layout="wide",
+    )
+
+    st.sidebar.title("Navigation")
+    section = st.sidebar.radio(
+        "Go to",
+        [
+            "Upload Data",
+            "Model Training",
+            "Model Evaluation",
+            "Player Risk Analysis",
+            "Decision Tree Explorer",
+        ],
+    )
+
+    if section == "Upload Data":
+        st.info("Upload Data section coming next.")
+    elif section == "Model Training":
+        st.info("Model Training section coming next.")
+    elif section == "Model Evaluation":
+        st.info("Model Evaluation section coming next.")
+    elif section == "Player Risk Analysis":
+        st.info("Player Risk Analysis section coming next.")
+    elif section == "Decision Tree Explorer":
+        st.info("Decision Tree Explorer section coming next.")
