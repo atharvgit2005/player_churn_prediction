@@ -187,3 +187,45 @@ def preprocess_data(
         "categorical_features": categorical_features,
         "categorical_modes": categorical_modes,
     }
+
+
+def _reset_training_state() -> None:
+    keys = [
+        "trained_models",
+        "model_metrics",
+        "confusion_matrices",
+        "data_bundle",
+        "target_configured",
+    ]
+    for key in keys:
+        st.session_state.pop(key, None)
+
+
+def _initialize_target_state(df: pd.DataFrame) -> None:
+    target_options = df.columns.tolist()
+    detected_target = _find_column_case_insensitive(df, "Churn")
+    fallback_target = _find_first_existing_column(df, ["EngagementLevel", "RetentionStatus"])
+
+    if "target_col" not in st.session_state or st.session_state["target_col"] not in target_options:
+        if detected_target:
+            st.session_state["target_col"] = detected_target
+        elif fallback_target and fallback_target in target_options:
+            st.session_state["target_col"] = fallback_target
+        else:
+            st.session_state["target_col"] = target_options[0]
+
+    selected_target = st.session_state["target_col"]
+    non_null = df[selected_target].dropna()
+
+    if non_null.nunique() == 2:
+        st.session_state["positive_classes"] = []
+        return
+
+    values = sorted(non_null.astype(str).str.strip().unique().tolist())
+    default_positive = _default_positive_classes(selected_target, values)
+
+    current = st.session_state.get("positive_classes", default_positive)
+    if not set(current).issubset(set(values)):
+        st.session_state["positive_classes"] = default_positive
+    elif "positive_classes" not in st.session_state:
+        st.session_state["positive_classes"] = default_positive
