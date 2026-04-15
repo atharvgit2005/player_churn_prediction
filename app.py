@@ -1,4 +1,5 @@
 import warnings
+import json
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
@@ -22,6 +23,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier, export_text, plot_tree
+
+from engagement_assistant import generate_engagement_optimization_report
 
 warnings.filterwarnings("ignore")
 RANDOM_STATE = 42
@@ -498,6 +501,7 @@ def main() -> None:
             "Model Evaluation",
             "Player Risk Analysis",
             "Decision Tree Explorer",
+            "Engagement Optimization Assistant",
         ],
     )
     uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
@@ -843,6 +847,109 @@ def main() -> None:
         split_text = export_text(dt_model, feature_names=feature_names, max_depth=view_depth)
         st.markdown("**Decision Tree feature splits**")
         st.code(split_text)
+    elif section == "Engagement Optimization Assistant":
+        st.subheader("Agentic AI Game Engagement Optimization Assistant")
+        st.caption(
+            "Generates a structured engagement optimization report using churn risk predictions and gameplay signals. "
+            "This milestone ships with an explicit-state agent workflow and conservative heuristics; retrieval + LLM are added in later commits."
+        )
+
+        if "trained_models" not in st.session_state:
+            st.info("Train a model first from the Model Training section.")
+            return
+
+        models = st.session_state["trained_models"]
+        bundle = st.session_state["data_bundle"]
+
+        selected_model_name = st.selectbox("Model", options=list(models.keys()), key="assistant_model")
+        selected_model = models[selected_model_name]
+
+        id_col = bundle.get("id_col")
+        row_index = st.selectbox(
+            "Select player row index",
+            options=bundle["X_model"].index.tolist(),
+            key="assistant_row",
+        )
+
+        player_display_row = bundle["X_display"].loc[row_index]
+        st.write("Player Snapshot")
+        st.dataframe(bundle["X_display"].loc[[row_index]], use_container_width=True)
+
+        player_identifier = None
+        if id_col and id_col in bundle["X_display"].columns:
+            try:
+                player_identifier = str(player_display_row.get(id_col))
+            except Exception:
+                player_identifier = None
+        if not player_identifier:
+            player_identifier = f"row_{row_index}"
+
+        if st.button("Generate Engagement Optimization Report", type="primary", use_container_width=True):
+            try:
+                player_model_row = bundle["X_model"].loc[[row_index]]
+                if hasattr(selected_model, "predict_proba"):
+                    churn_probability = float(selected_model.predict_proba(player_model_row)[0, 1])
+                elif hasattr(selected_model, "decision_function"):
+                    decision_value = float(selected_model.decision_function(player_model_row)[0])
+                    churn_probability = 1.0 / (1.0 + np.exp(-decision_value))
+                else:
+                    churn_probability = float(selected_model.predict(player_model_row)[0])
+
+                report, state = generate_engagement_optimization_report(
+                    player_features=player_display_row.to_dict(),
+                    churn_probability=churn_probability,
+                    player_identifier=player_identifier,
+                )
+
+                st.markdown("**Player Behavior Summary**")
+                st.json(report.player_behavior_summary)
+
+                st.markdown("**Churn Risk Interpretation**")
+                st.json(report.churn_risk_interpretation)
+
+                st.markdown("**Engagement & Retention Recommendations**")
+                for idx, rec in enumerate(report.engagement_and_retention_recommendations, start=1):
+                    with st.expander(f"{idx}. {rec.title}", expanded=(idx == 1)):
+                        st.write(f"**Rationale:** {rec.rationale}")
+                        st.write(f"**Expected impact:** {rec.expected_impact}")
+                        st.write(f"**Effort:** {rec.effort}")
+                        st.write(f"**Risk:** {rec.risk}")
+                        if rec.metrics_to_track:
+                            st.write("**Metrics to track:**")
+                            st.write(", ".join(rec.metrics_to_track))
+                        if rec.references:
+                            st.write("**References:**")
+                            for ref in rec.references:
+                                st.write(f"- {ref.title} ({ref.source})")
+
+                st.markdown("**Supporting References**")
+                for ref in report.supporting_references:
+                    st.write(f"- {ref.title} ({ref.source})")
+
+                if report.data_quality_notes:
+                    st.markdown("**Data Quality Notes**")
+                    for note in report.data_quality_notes:
+                        st.write(f"- {note}")
+
+                st.markdown("**Ethical & User-Experience Disclaimers**")
+                for disclaimer in report.ethical_and_ux_disclaimers:
+                    st.write(f"- {disclaimer}")
+
+                with st.expander("Agent State / Audit Trail", expanded=False):
+                    st.write(f"Current step: `{state.step}`")
+                    st.json([e.__dict__ for e in state.events])
+
+                # Download a JSON copy for submission / reproducibility.
+                report_json = report.to_dict()
+                st.download_button(
+                    "Download Report (JSON)",
+                    data=json.dumps(report_json, indent=2, ensure_ascii=True),
+                    file_name=f"engagement_optimization_report_{player_identifier}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                )
+            except Exception as exc:
+                st.error(f"Failed to generate report: {exc}")
 
 
 if __name__ == "__main__":
