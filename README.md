@@ -6,6 +6,14 @@ A Streamlit app to predict player churn using machine learning and provide inter
 ## Overview
 This project lets you upload a player dataset, train churn models, evaluate model performance, and inspect player-level risk through dashboard sections like Data Overview, Model Training, Model Evaluation, Player Risk Analysis, and Decision Tree Explorer.
 
+## Milestone 2 (Agentic Engagement Assistant)
+This repo now includes an **Agentic AI Game Engagement Optimization Assistant** that:
+- Interprets churn risk predictions for a selected player
+- Summarizes observable engagement/progression/monetization signals
+- Produces a **structured engagement optimization report** with recommendations, references, and ethical disclaimers
+
+In this first milestone commit, recommendations are **conservative heuristics** with an explicit state/audit trail. (Retrieval-backed references + optional LLM integration are planned in follow-up commits.)
+
 ## Tech Stack
 - Python
 - Streamlit
@@ -45,3 +53,9 @@ streamlit run app.py
 ```
 
 5. Open the local URL shown in terminal (usually `http://localhost:8501`).
+
+### Using The Assistant
+1. Upload a CSV (or use the included sample dataset).
+2. Train a model in **Model Training**.
+3. Open **Engagement Optimization Assistant** in the sidebar.
+4. Select a player row and generate the report.
