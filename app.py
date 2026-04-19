@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
@@ -19,17 +20,450 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     roc_auc_score,
+    roc_curve,
 )
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeClassifier, export_text, plot_tree
 
-from engagement_assistant import generate_engagement_optimization_report
+from engagement_assistant import (
+    build_report_payload,
+    generate_engagement_optimization_report,
+    generate_report_pdf_bytes,
+    validate_report_payload,
+    validation_error_message,
+)
 
 warnings.filterwarnings("ignore")
 RANDOM_STATE = 42
 SAMPLE_DATASET_PATH = Path(__file__).with_name("online_gaming_behavior_dataset.csv")
+ACCENT_COLOR = "#FF4B4B"
+BG_COLOR = "#0F0F0F"
+SURFACE_COLOR = "#1A1A1A"
+BORDER_COLOR = "#2A2A2A"
+TEXT_PRIMARY = "#F5F5F5"
+TEXT_MUTED = "#888888"
+
+
+def _inject_global_styles() -> None:
+    st.markdown(
+        f"""
+        <style>
+        #MainMenu {{visibility: hidden;}}
+        footer {{visibility: hidden;}}
+        header {{visibility: hidden;}}
+        .stApp {{
+            background: {BG_COLOR};
+            color: {TEXT_PRIMARY};
+        }}
+        [data-testid="stAppViewContainer"] {{
+            background: radial-gradient(circle at top right, rgba(255,75,75,0.10), transparent 20%), {BG_COLOR};
+        }}
+        [data-testid="stMainBlockContainer"] {{
+            max-width: 1380px;
+            padding-top: 1.2rem;
+            padding-bottom: 2rem;
+            padding-left: 1.4rem;
+            padding-right: 1.4rem;
+        }}
+        [data-testid="stSidebar"] {{
+            background: #111111;
+            border-right: 1px solid {BORDER_COLOR};
+        }}
+        [data-testid="stSidebar"] .block-container {{
+            padding-top: 1rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }}
+        [data-testid="stSidebar"] label,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] div {{
+            color: {TEXT_PRIMARY};
+        }}
+        .sidebar-wordmark {{
+            font-size: 1.55rem;
+            font-weight: 800;
+            color: {TEXT_PRIMARY};
+            letter-spacing: -0.03em;
+            margin-bottom: 0.15rem;
+        }}
+        .sidebar-subtitle {{
+            color: {TEXT_MUTED};
+            font-size: 0.92rem;
+            margin-bottom: 1rem;
+        }}
+        .sidebar-label {{
+            color: {TEXT_MUTED};
+            font-size: 0.72rem;
+            letter-spacing: 0.16em;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin: 0.4rem 0 0.5rem 0;
+        }}
+        .sidebar-divider {{
+            height: 1px;
+            background: {BORDER_COLOR};
+            margin: 0.8rem 0 1rem 0;
+        }}
+        [data-testid="stRadio"] label {{
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 0.55rem 0.75rem;
+            margin-bottom: 0.2rem;
+        }}
+        [data-testid="stRadio"] label:hover {{
+            background: rgba(255,255,255,0.04);
+            border-color: {BORDER_COLOR};
+        }}
+        div[role="radiogroup"] > label[data-baseweb="radio"] > div:first-child {{
+            display: none;
+        }}
+        .card {{
+            background: linear-gradient(180deg, rgba(26,26,26,0.95), rgba(18,18,18,0.95));
+            border: 1px solid {BORDER_COLOR};
+            border-radius: 18px;
+            padding: 1rem 1rem 0.9rem 1rem;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+            margin-bottom: 1rem;
+        }}
+        .card-title {{
+            color: {TEXT_PRIMARY};
+            font-size: 1rem;
+            font-weight: 700;
+            margin: 0 0 0.3rem 0;
+        }}
+        .page-title {{
+            color: {TEXT_PRIMARY};
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin: 0;
+        }}
+        .page-subtitle {{
+            color: {TEXT_MUTED};
+            font-size: 1rem;
+            margin-top: 0.35rem;
+            margin-bottom: 1.1rem;
+            max-width: 68ch;
+        }}
+        .section-note {{
+            color: {TEXT_MUTED};
+            font-size: 0.9rem;
+            margin-bottom: 0.6rem;
+        }}
+        .info-banner {{
+            border-left: 4px solid {ACCENT_COLOR};
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 0.9rem 1rem;
+            color: {TEXT_PRIMARY};
+            margin-bottom: 1rem;
+        }}
+        .metric-panel {{
+            background: {SURFACE_COLOR};
+            border: 1px solid {BORDER_COLOR};
+            border-left: 4px solid {ACCENT_COLOR};
+            border-radius: 16px;
+            padding: 0.9rem 1rem;
+        }}
+        .metric-panel .metric-label {{
+            color: {TEXT_MUTED};
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            font-weight: 700;
+        }}
+        .metric-panel .metric-value {{
+            color: {TEXT_PRIMARY};
+            font-size: 1.45rem;
+            font-weight: 800;
+            margin-top: 0.28rem;
+        }}
+        .metric-panel .metric-note {{
+            color: {TEXT_MUTED};
+            font-size: 0.82rem;
+            margin-top: 0.18rem;
+        }}
+        .step-row {{
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.7rem;
+            margin: 0.35rem 0 0.9rem 0;
+        }}
+        .step-chip {{
+            border: 1px solid {BORDER_COLOR};
+            border-radius: 14px;
+            padding: 0.75rem 0.85rem;
+            background: rgba(255,255,255,0.02);
+        }}
+        .step-chip.active {{
+            border-color: rgba(255,75,75,0.55);
+            background: rgba(255,75,75,0.10);
+        }}
+        .step-chip.done {{
+            border-color: rgba(34,197,94,0.45);
+            background: rgba(34,197,94,0.08);
+        }}
+        .step-chip .step-title {{
+            color: {TEXT_PRIMARY};
+            font-size: 0.9rem;
+            font-weight: 700;
+        }}
+        .step-chip .step-copy {{
+            color: {TEXT_MUTED};
+            font-size: 0.8rem;
+            margin-top: 0.2rem;
+        }}
+        .chat-shell {{
+            background: linear-gradient(180deg, rgba(26,26,26,0.95), rgba(18,18,18,0.98));
+            border: 1px solid {BORDER_COLOR};
+            border-radius: 18px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }}
+        .chat-heading {{
+            color: {TEXT_PRIMARY};
+            font-size: 1.05rem;
+            font-weight: 750;
+        }}
+        .chat-copy {{
+            color: {TEXT_MUTED};
+            font-size: 0.9rem;
+            margin-top: 0.22rem;
+        }}
+        .report-divider {{
+            height: 1px;
+            background: {BORDER_COLOR};
+            margin: 1rem 0;
+        }}
+        .sample-card {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }}
+        .sample-card .sample-icon {{
+            font-size: 1.8rem;
+        }}
+        div.stButton > button,
+        div.stDownloadButton > button {{
+            background: {ACCENT_COLOR};
+            color: white;
+            border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 12px;
+            font-weight: 700;
+            padding: 0.55rem 0.9rem;
+        }}
+        div.stButton > button:hover,
+        div.stDownloadButton > button:hover {{
+            background: #ff6666;
+            border-color: rgba(255,255,255,0.08);
+        }}
+        div.stButton > button[kind="secondary"],
+        button[kind="secondary"] {{
+            background: transparent;
+            color: {TEXT_PRIMARY};
+            border: 1px solid {BORDER_COLOR};
+        }}
+        [data-testid="stFileUploader"] section {{
+            background: {SURFACE_COLOR};
+            border: 1px dashed {BORDER_COLOR};
+            border-radius: 14px;
+            padding: 0.65rem;
+        }}
+        [data-testid="stDataFrame"] {{
+            border: 1px solid {BORDER_COLOR};
+            border-radius: 16px;
+            overflow: hidden;
+        }}
+        [data-testid="stDataFrame"] thead tr th {{
+            background: #141414 !important;
+            color: {TEXT_PRIMARY} !important;
+        }}
+        [data-testid="stDataFrame"] tbody tr:nth-child(even) td {{
+            background: rgba(255,255,255,0.02) !important;
+        }}
+        [data-testid="stMetric"] {{
+            background: {SURFACE_COLOR};
+            border: 1px solid {BORDER_COLOR};
+            border-left: 4px solid {ACCENT_COLOR};
+            padding: 0.9rem 0.95rem;
+            border-radius: 16px;
+        }}
+        [data-testid="stExpander"] {{
+            border: 1px solid {BORDER_COLOR};
+            border-radius: 14px;
+            background: rgba(255,255,255,0.02);
+        }}
+        .legend-note {{
+            color: {TEXT_MUTED};
+            font-size: 0.86rem;
+            margin-top: 0.5rem;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def card(content_fn, title: Optional[str] = None) -> None:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    if title:
+        st.markdown(f'<p class="card-title">{title}</p>', unsafe_allow_html=True)
+    content_fn()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def _page_header(title: str, subtitle: str) -> None:
+    st.markdown(f"<div class='page-title'>{title}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='page-subtitle'>{subtitle}</div>", unsafe_allow_html=True)
+
+
+def _sidebar_label(text: str) -> None:
+    st.sidebar.markdown(f"<div class='sidebar-label'>{text}</div>", unsafe_allow_html=True)
+
+
+def _info_banner(text: str, icon: str = "ℹ️") -> None:
+    st.markdown(f"<div class='info-banner'>{icon} {text}</div>", unsafe_allow_html=True)
+
+
+def _metric_panel(label: str, value: str, note: Optional[str] = None, accent: str = ACCENT_COLOR) -> None:
+    st.markdown(
+        f"""
+        <div class="metric-panel" style="border-left-color:{accent};">
+            <div class="metric-label">{label}</div>
+            <div class="metric-value">{value}</div>
+            <div class="metric-note">{note or ''}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def _step_indicator(active_step: int) -> None:
+    steps = [
+        ("Ingest", "Load and validate player data."),
+        ("Prepare", "Build target and feature pipeline."),
+        ("Train", "Fit the selected churn model."),
+        ("Evaluate", "Review metrics and risk outputs."),
+    ]
+    html = ["<div class='step-row'>"]
+    for index, (title, copy) in enumerate(steps, start=1):
+        state_class = "done" if index < active_step else "active" if index == active_step else ""
+        html.append(
+            f"<div class='step-chip {state_class}'><div class='step-title'>{index}. {title}</div>"
+            f"<div class='step-copy'>{copy}</div></div>"
+        )
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
+
+
+def _plotly_theme(fig: go.Figure) -> go.Figure:
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=TEXT_PRIMARY),
+        margin=dict(l=24, r=24, t=42, b=24),
+    )
+    return fig
+
+
+def _plotly_confusion_matrix(cm: np.ndarray, title: str) -> go.Figure:
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=cm,
+            x=["Pred Non-Churn", "Pred Churn"],
+            y=["Actual Non-Churn", "Actual Churn"],
+            colorscale=[[0, "#1A1A1A"], [1, ACCENT_COLOR]],
+            text=cm,
+            texttemplate="%{text}",
+            showscale=False,
+        )
+    )
+    fig.update_layout(title=title)
+    return _plotly_theme(fig)
+
+
+def _plotly_probability_hist(probabilities: np.ndarray) -> go.Figure:
+    fig = go.Figure(
+        data=[
+            go.Histogram(
+                x=probabilities,
+                nbinsx=24,
+                marker=dict(color=ACCENT_COLOR, line=dict(color="#111111", width=1)),
+                opacity=0.92,
+            )
+        ]
+    )
+    fig.update_layout(title="Churn Probability Distribution", xaxis_title="Predicted probability", yaxis_title="Players")
+    return _plotly_theme(fig)
+
+
+def _plotly_risk_distribution(probability_frame: pd.DataFrame) -> go.Figure:
+    risk_counts = probability_frame["risk_level"].value_counts().reindex(["Low", "Medium", "High"], fill_value=0)
+    fig = go.Figure(
+        data=[
+            go.Bar(
+                x=risk_counts.index.tolist(),
+                y=risk_counts.values.tolist(),
+                marker=dict(color=["#22C55E", "#F59E0B", "#EF4444"]),
+            )
+        ]
+    )
+    fig.update_layout(title="Risk Bucket Distribution", xaxis_title="Risk level", yaxis_title="Players")
+    return _plotly_theme(fig)
+
+
+def _plotly_roc_curve(y_true: pd.Series, probabilities: np.ndarray, roc_auc: float) -> go.Figure:
+    fpr, tpr, _ = roc_curve(y_true, probabilities)
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=fpr, y=tpr, mode="lines", line=dict(color=ACCENT_COLOR, width=3), name="ROC"))
+    fig.add_trace(
+        go.Scatter(
+            x=[0, 1],
+            y=[0, 1],
+            mode="lines",
+            line=dict(color=TEXT_MUTED, width=1, dash="dash"),
+            name="Baseline",
+        )
+    )
+    fig.update_layout(title=f"ROC Curve (AUC {roc_auc:.3f})", xaxis_title="False Positive Rate", yaxis_title="True Positive Rate")
+    return _plotly_theme(fig)
+
+
+def _plotly_feature_importance(importance_df: pd.DataFrame) -> go.Figure:
+    top_df = importance_df.head(10).sort_values("importance", ascending=True)
+    fig = go.Figure(
+        data=[
+            go.Bar(
+                x=top_df["importance"],
+                y=top_df["feature"],
+                orientation="h",
+                marker=dict(color=ACCENT_COLOR),
+            )
+        ]
+    )
+    fig.update_layout(title="Feature Importance", xaxis_title="Importance", yaxis_title="Feature")
+    return _plotly_theme(fig)
+
+
+def _format_file_size(size_bytes: Optional[int]) -> str:
+    if not size_bytes:
+        return "Unknown"
+    units = ["B", "KB", "MB", "GB"]
+    size = float(size_bytes)
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size_bytes} B"
+
+
+def _page_divider() -> None:
+    st.markdown("<div class='report-divider'></div>", unsafe_allow_html=True)
 
 
 def _find_column_case_insensitive(df: pd.DataFrame, target_name: str) -> Optional[str]:
@@ -484,9 +918,9 @@ def _render_risk_badge(risk_level: str, probability: float) -> None:
     color = _risk_color(risk_level)
     st.markdown(
         f"""
-        <div style="padding:0.65rem 0.9rem;border-radius:0.6rem;background:{color}22;border:1px solid {color};display:inline-block;">
+        <div style="padding:0.75rem 1rem;border-radius:0.9rem;background:{color}18;border:1px solid {color};display:inline-block;">
             <span style="font-weight:700;color:{color};">{risk_level} Risk</span>
-            <span style="margin-left:0.55rem;color:#111827;">{probability:.1%} churn probability</span>
+            <span style="margin-left:0.55rem;color:{TEXT_PRIMARY};">{probability:.1%} churn probability</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -513,18 +947,11 @@ def _render_chip_row(items: List[str], accent: str = "#0f172a") -> None:
 
 
 def _render_summary_card(label: str, value: str, note: Optional[str] = None, accent: str = "#2563eb") -> None:
-    with st.container(border=True):
-        st.markdown(
-            f"<div style='font-size:0.8rem;letter-spacing:0.06em;text-transform:uppercase;color:{accent};font-weight:700;'>{label}</div>",
-            unsafe_allow_html=True,
-        )
-        st.markdown(f"<div style='font-size:1.25rem;font-weight:800;margin-top:0.15rem;'>{value}</div>", unsafe_allow_html=True)
-        if note:
-            st.caption(note)
+    _metric_panel(label, value, note=note, accent=accent)
 
 
 def _render_recommendation_preview(rec, index: int) -> None:
-    with st.container(border=True):
+    with st.container():
         title_cols = st.columns([3, 1])
         with title_cols[0]:
             st.markdown(f"**{index}. {rec.title}**")
@@ -565,7 +992,7 @@ def _render_strategies_preview(report) -> None:
 
     with st.expander("Retrieved strategies", expanded=False):
         for strategy in report.retrieved_strategies:
-            with st.container(border=True):
+            with st.container():
                 st.markdown(f"**{strategy.title}**")
                 st.caption(f"{strategy.source} · score {strategy.score:.2f}")
                 st.write(_truncate_text(strategy.when_to_use, 180))
@@ -596,18 +1023,18 @@ def _render_hero_card(report) -> None:
         <div style="
             padding: 1.45rem 1.55rem;
             border-radius: 1.15rem;
-            background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, {accent}12 100%);
+            background: linear-gradient(135deg, rgba(26,26,26,0.98) 0%, {accent}15 100%);
             border: 1px solid {accent}28;
-            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.24);
             margin: 0.25rem 0 0.35rem 0;
         ">
             <div style="font-size:0.75rem;letter-spacing:0.16em;text-transform:uppercase;color:{accent};font-weight:800;">
                 Executive focus
             </div>
-            <div style="font-size:1.3rem;font-weight:850;margin-top:0.35rem;color:#0f172a;line-height:1.2;">
+            <div style="font-size:1.3rem;font-weight:850;margin-top:0.35rem;color:{TEXT_PRIMARY};line-height:1.2;">
                 {top_rec.title if top_rec else 'No recommendation generated'}
             </div>
-            <div style="margin-top:0.55rem;color:#334155;line-height:1.55;font-size:0.98rem;max-width:62ch;">
+            <div style="margin-top:0.55rem;color:{TEXT_MUTED};line-height:1.55;font-size:0.98rem;max-width:62ch;">
                 {_truncate_text(top_rec.rationale, 180) if top_rec else 'The assistant did not generate a recommendation for this player.'}
             </div>
         </div>
@@ -656,11 +1083,13 @@ def _render_executive_summary(report) -> None:
 
 def _render_full_details(report, state, player_identifier: str) -> None:
     with st.expander("Full analysis", expanded=True):
-        st.markdown("**Player behavior summary**")
+        st.markdown("### Player Behavior Summary")
         st.json(report.player_behavior_summary)
-        st.markdown("**Churn risk interpretation**")
+        _page_divider()
+        st.markdown("### Churn Risk Interpretation")
         st.json(report.churn_risk_interpretation)
-        st.markdown("**Analysis summary**")
+        _page_divider()
+        st.markdown("### Analysis Summary")
         st.json(report.analysis_summary)
 
     _render_strategies_preview(report)
@@ -685,24 +1114,49 @@ def _render_full_details(report, state, player_identifier: str) -> None:
         st.write(f"Current step: `{state.step}`")
         st.json([e.__dict__ for e in state.events])
 
+
+def _render_report_exports(report, player_identifier: str) -> None:
     report_json = report.to_dict()
-    st.download_button(
-        "Download Report (JSON)",
-        data=json.dumps(report_json, indent=2, ensure_ascii=True),
-        file_name=f"engagement_optimization_report_{player_identifier}.json",
-        mime="application/json",
-        use_container_width=True,
-    )
+    payload = build_report_payload(report)
+    missing_sections = validate_report_payload(payload)
+
+    export_cols = st.columns(2)
+    with export_cols[0]:
+        st.download_button(
+            "⬇️ Download Report (JSON)",
+            data=json.dumps(report_json, indent=2, ensure_ascii=True),
+            file_name=f"engagement_optimization_report_{player_identifier}.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+
+    with export_cols[1]:
+        if missing_sections:
+            st.error(validation_error_message(missing_sections))
+        else:
+            pdf_bytes = generate_report_pdf_bytes(payload)
+            st.download_button(
+                "📄 Download as PDF",
+                data=pdf_bytes,
+                file_name=f"engagement_optimization_report_{player_identifier}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
 
 
 def main() -> None:
     st.set_page_config(
-        page_title="Player Churn Dashboard",
-        page_icon="🎮",
+        page_title="ChurnIQ",
+        page_icon="⚡",
         layout="wide",
+        initial_sidebar_state="expanded",
     )
+    _inject_global_styles()
 
-    st.sidebar.title("Navigation")
+    st.sidebar.markdown("<div class='sidebar-wordmark'>⚡ ChurnIQ</div>", unsafe_allow_html=True)
+    st.sidebar.markdown("<div class='sidebar-subtitle'>Player Analytics Platform</div>", unsafe_allow_html=True)
+    st.sidebar.markdown("<div class='sidebar-divider'></div>", unsafe_allow_html=True)
+    _sidebar_label("Navigation")
     section = st.sidebar.radio(
         "Go to",
         [
@@ -713,8 +1167,22 @@ def main() -> None:
             "Decision Tree Explorer",
             "Engagement Optimization Assistant",
         ],
+        label_visibility="collapsed",
     )
+    st.sidebar.markdown("<div class='sidebar-divider'></div>", unsafe_allow_html=True)
+    _sidebar_label("Data")
     uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+    if st.sidebar.button("Use Sample Dataset", type="primary", use_container_width=True, key="sidebar_use_sample_dataset"):
+        try:
+            sample_df = load_sample_data()
+            st.session_state["raw_df"] = sample_df
+            st.session_state["dataset_source"] = "sample"
+            st.session_state["dataset_name"] = SAMPLE_DATASET_PATH.name
+            st.session_state["dataset_size_bytes"] = SAMPLE_DATASET_PATH.stat().st_size
+            st.sidebar.success("Sample dataset loaded.")
+            st.rerun()
+        except Exception as exc:
+            st.sidebar.error(f"Failed to load sample dataset: {exc}")
 
     df = None
     if uploaded_file is not None:
@@ -723,6 +1191,7 @@ def main() -> None:
             st.session_state["raw_df"] = df
             st.session_state["dataset_source"] = "upload"
             st.session_state["dataset_name"] = getattr(uploaded_file, "name", "uploaded.csv")
+            st.session_state["dataset_size_bytes"] = getattr(uploaded_file, "size", None)
         except Exception as exc:
             st.error(f"Failed to read uploaded file: {exc}")
             return
@@ -733,15 +1202,28 @@ def main() -> None:
         _initialize_target_state(df)
 
     if section == "Upload Data":
-        st.subheader("Data Overview")
+        _page_header(
+            "Data Overview",
+            "Ingest your player dataset, inspect schema quality, and confirm the churn target before training.",
+        )
 
-        with st.container(border=True):
-            sample_cols = st.columns([3, 1])
+        def sample_card() -> None:
+            sample_cols = st.columns([4, 1.2])
             with sample_cols[0]:
-                st.markdown("**Sample Dataset**")
-                st.caption("Load the bundled gaming behavior dataset with one click. This uses the same CSV provided in your Downloads folder.")
+                st.markdown(
+                    """
+                    <div class='sample-card'>
+                        <div>
+                            <div class='sample-icon'>📊</div>
+                            <div style='color:#F5F5F5;font-weight:700;font-size:1.05rem;margin-top:0.35rem;'>Sample Dataset</div>
+                            <div class='section-note'>Load the bundled online gaming behavior CSV for a fast demo of the full churn workflow.</div>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
                 if SAMPLE_DATASET_PATH.exists():
-                    st.caption(f"Source: `{SAMPLE_DATASET_PATH.name}`")
+                    st.caption(f"Bundled file: `{SAMPLE_DATASET_PATH.name}`")
             with sample_cols[1]:
                 if st.button("Use Sample Dataset", type="primary", use_container_width=True, key="use_sample_dataset"):
                     try:
@@ -749,13 +1231,16 @@ def main() -> None:
                         st.session_state["raw_df"] = sample_df
                         st.session_state["dataset_source"] = "sample"
                         st.session_state["dataset_name"] = SAMPLE_DATASET_PATH.name
+                        st.session_state["dataset_size_bytes"] = SAMPLE_DATASET_PATH.stat().st_size
                         st.success("Sample dataset loaded.")
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Failed to load sample dataset: {exc}")
 
+        card(sample_card)
+
         if df is None:
-            st.info("Upload a CSV file from the sidebar or click 'Use Sample Dataset' to begin.")
+            _info_banner("Upload a CSV from the sidebar or load the bundled sample dataset to begin.")
             return
 
         if df.empty:
@@ -764,45 +1249,73 @@ def main() -> None:
 
         dataset_label = st.session_state.get("dataset_name", "Uploaded CSV")
         dataset_source = st.session_state.get("dataset_source", "upload")
-        st.caption(f"Current dataset: `{dataset_label}` ({dataset_source})")
-
-        st.write("Raw Dataset Preview")
-        st.dataframe(df.head(20), use_container_width=True)
-
-        shape_col_1, shape_col_2 = st.columns(2)
-        shape_col_1.metric("Rows", f"{df.shape[0]:,}")
-        shape_col_2.metric("Columns", f"{df.shape[1]:,}")
+        dataset_size = st.session_state.get("dataset_size_bytes")
 
         target_col = _find_column_case_insensitive(df, "Churn")
         if target_col is None:
             target_col = df.columns[-1]
+        churn_rate = None
+        try:
+            churn_rate = df[target_col].astype(str).str.strip().str.lower().eq("low").mean()
+        except Exception:
+            churn_rate = None
+
+        metric_cols = st.columns(4)
+        with metric_cols[0]:
+            _metric_panel("Total Players", f"{df.shape[0]:,}", note=dataset_label)
+        with metric_cols[1]:
+            _metric_panel("Features", f"{df.shape[1]:,}", note=f"Source: {dataset_source}")
+        with metric_cols[2]:
+            _metric_panel("Churn Rate", f"{(churn_rate or 0):.1%}" if churn_rate is not None else "N/A", note=f"Target: {target_col}")
+        with metric_cols[3]:
+            _metric_panel("File Size", _format_file_size(dataset_size), note="Current dataset")
+
+        _info_banner(f"Current dataset: {dataset_label} ({dataset_source})", icon="🗂️")
+
+        def preview_card() -> None:
+            st.markdown("<div class='section-note'>Preview the first 20 rows to confirm feature names and data types.</div>", unsafe_allow_html=True)
+            st.dataframe(df.head(20), use_container_width=True)
+        card(preview_card, title="Raw Dataset Preview")
 
         class_dist = df[target_col].astype(str).value_counts(dropna=False).rename_axis("Class").reset_index(name="Count")
-        st.write(f"Class Distribution (`{target_col}`)")
-        st.dataframe(class_dist, use_container_width=True)
+        card(lambda: st.dataframe(class_dist, use_container_width=True), title=f"Class Distribution ({target_col})")
     elif section == "Model Training":
-        st.subheader("Model Training")
+        _page_header(
+            "Model Training",
+            "Configure the split, train the decision tree pipeline, and inspect the model metrics in a cleaner workflow.",
+        )
         if df is None:
-            st.info("Upload data first in the sidebar.")
+            _info_banner("Upload data first from the sidebar before training.", icon="📁")
             return
 
-        test_size = st.slider(
-            "Train/Test split (test proportion)",
-            min_value=0.10,
-            max_value=0.40,
-            value=0.20,
-            step=0.05,
-        )
-        depth_slider = st.slider(
-            "Decision Tree max depth (0 = no limit)",
-            min_value=0,
-            max_value=20,
-            value=6,
-        )
+        _step_indicator(3)
+
+        def parameter_card() -> None:
+            st.markdown("<div class='section-note'>Tune the training split and tree depth before fitting the model.</div>", unsafe_allow_html=True)
+            nonlocal_test_size = st.slider(
+                "Train/Test split (test proportion)",
+                min_value=0.10,
+                max_value=0.40,
+                value=0.20,
+                step=0.05,
+            )
+            nonlocal_depth_slider = st.slider(
+                "Decision Tree max depth (0 = no limit)",
+                min_value=0,
+                max_value=20,
+                value=6,
+            )
+            st.session_state["_ui_test_size"] = nonlocal_test_size
+            st.session_state["_ui_depth_slider"] = nonlocal_depth_slider
+
+        card(parameter_card, title="Training Parameters")
+        test_size = st.session_state.get("_ui_test_size", 0.20)
+        depth_slider = st.session_state.get("_ui_depth_slider", 6)
         dt_max_depth = None if depth_slider == 0 else depth_slider
 
         if st.button("Train Model", type="primary", use_container_width=True):
             try:
+                progress = st.progress(0.0, text="Preparing training pipeline")
                 bundle = preprocess_data(
                     df,
                     st.session_state["target_col"],
@@ -813,6 +1326,7 @@ def main() -> None:
                 y = bundle["y"]
                 preprocessor = bundle["preprocessor"]
                 class_weight = "balanced" if bundle["is_imbalanced"] else None
+                progress.progress(0.35, text="Splitting data")
 
                 stratify_y = y if y.value_counts().min() >= 2 else None
                 x_train, x_test, y_train, y_test = train_test_split(
@@ -822,6 +1336,7 @@ def main() -> None:
                     random_state=RANDOM_STATE,
                     stratify=stratify_y,
                 )
+                progress.progress(0.65, text="Training decision tree model")
 
                 decision_tree = Pipeline(
                     steps=[
@@ -841,6 +1356,7 @@ def main() -> None:
 
                 y_pred = decision_tree.predict(x_test)
                 y_prob = decision_tree.predict_proba(x_test)[:, 1]
+                progress.progress(0.9, text="Computing evaluation metrics")
                 metrics = {
                     "Accuracy": accuracy_score(y_test, y_pred),
                     "Precision": precision_score(y_test, y_pred, zero_division=0),
@@ -855,57 +1371,70 @@ def main() -> None:
                     "Decision Tree": confusion_matrix(y_test, y_pred, labels=[0, 1])
                 }
                 st.session_state["data_bundle"] = bundle
+                st.session_state["evaluation_bundle"] = {
+                    "X_test": x_test,
+                    "y_test": y_test,
+                    "y_prob": {"Decision Tree": y_prob},
+                }
+                progress.progress(1.0, text="Training complete")
 
                 st.success("Decision Tree training completed.")
                 metric_cols = st.columns(5)
-                metric_cols[0].metric("Accuracy", f"{metrics['Accuracy']:.4f}")
-                metric_cols[1].metric("Precision", f"{metrics['Precision']:.4f}")
-                metric_cols[2].metric("Recall", f"{metrics['Recall']:.4f}")
-                metric_cols[3].metric("F1", f"{metrics['F1']:.4f}")
-                metric_cols[4].metric("ROC-AUC", f"{metrics['ROC-AUC']:.4f}")
+                with metric_cols[0]:
+                    _metric_panel("Accuracy", f"{metrics['Accuracy']:.4f}", note="Test split")
+                with metric_cols[1]:
+                    _metric_panel("Precision", f"{metrics['Precision']:.4f}")
+                with metric_cols[2]:
+                    _metric_panel("Recall", f"{metrics['Recall']:.4f}")
+                with metric_cols[3]:
+                    _metric_panel("F1", f"{metrics['F1']:.4f}")
+                with metric_cols[4]:
+                    _metric_panel("ROC-AUC", f"{metrics['ROC-AUC']:.4f}")
             except Exception as exc:
                 st.error(f"Training failed: {exc}")
     elif section == "Model Evaluation":
-        st.subheader("Model Evaluation")
+        _page_header(
+            "Model Evaluation",
+            "Compare performance, inspect risk distributions, and drill into the prediction output with dark-mode analytics cards.",
+        )
         if "trained_models" not in st.session_state:
-            st.info("Train models first from the Model Training section.")
+            _info_banner("Train models first from the Model Training section.", icon="🧠")
             return
 
         metrics_map = st.session_state["model_metrics"]
         models = st.session_state["trained_models"]
         cm_map = st.session_state["confusion_matrices"]
         bundle = st.session_state["data_bundle"]
+        evaluation_bundle = st.session_state.get("evaluation_bundle", {})
 
         comparison_df = pd.DataFrame(metrics_map).T
-        st.write("Model Comparison")
-        st.dataframe(comparison_df.round(4), use_container_width=True)
+        card(lambda: st.dataframe(comparison_df.round(4), use_container_width=True), title="Model Comparison")
 
         selected_model = st.selectbox("Detailed evaluation model", options=list(models.keys()))
         selected_metrics = metrics_map[selected_model]
 
         metric_cols = st.columns(5)
-        metric_cols[0].metric("Accuracy", f"{selected_metrics['Accuracy']:.4f}")
-        metric_cols[1].metric("Precision", f"{selected_metrics['Precision']:.4f}")
-        metric_cols[2].metric("Recall", f"{selected_metrics['Recall']:.4f}")
-        metric_cols[3].metric("F1", f"{selected_metrics['F1']:.4f}")
-        metric_cols[4].metric("ROC-AUC", f"{selected_metrics['ROC-AUC']:.4f}")
+        with metric_cols[0]:
+            _metric_panel("Accuracy", f"{selected_metrics['Accuracy']:.4f}")
+        with metric_cols[1]:
+            _metric_panel("Precision", f"{selected_metrics['Precision']:.4f}")
+        with metric_cols[2]:
+            _metric_panel("Recall", f"{selected_metrics['Recall']:.4f}")
+        with metric_cols[3]:
+            _metric_panel("F1", f"{selected_metrics['F1']:.4f}")
+        with metric_cols[4]:
+            _metric_panel("ROC-AUC", f"{selected_metrics['ROC-AUC']:.4f}")
 
         eval_left, eval_right = st.columns(2)
         with eval_left:
             cm = cm_map[selected_model]
-            cm_fig, cm_ax = plt.subplots(figsize=(4.5, 4))
-            im = cm_ax.imshow(cm, cmap="Blues")
-            cm_fig.colorbar(im, ax=cm_ax)
-            cm_ax.set_title(f"{selected_model} Confusion Matrix")
-            cm_ax.set_xlabel("Predicted")
-            cm_ax.set_ylabel("Actual")
-            cm_ax.set_xticks([0, 1])
-            cm_ax.set_yticks([0, 1])
-            for i in range(cm.shape[0]):
-                for j in range(cm.shape[1]):
-                    cm_ax.text(j, i, str(cm[i, j]), ha="center", va="center", color="black")
-            plt.tight_layout()
-            st.pyplot(cm_fig)
+            def confusion_card() -> None:
+                st.markdown("<div class='section-note'>Inspect false positives and false negatives on the test split.</div>", unsafe_allow_html=True)
+                st.plotly_chart(
+                    _plotly_confusion_matrix(cm, f"{selected_model} Confusion Matrix"),
+                    use_container_width=True,
+                )
+            card(confusion_card, title="Confusion Matrix")
 
         probabilities = models[selected_model].predict_proba(bundle["X_model"])[:, 1]
         probability_frame = bundle["X_display"].copy()
@@ -913,28 +1442,36 @@ def main() -> None:
         probability_frame["risk_level"] = probability_frame["churn_probability"].apply(_risk_bucket)
 
         with eval_right:
-            hist_fig, hist_ax = plt.subplots(figsize=(6.5, 3.8))
-            hist_ax.hist(probability_frame["churn_probability"], bins=20, color="#0ea5e9", edgecolor="white")
-            hist_ax.set_title("Churn Probability Distribution")
-            hist_ax.set_xlabel("Probability")
-            hist_ax.set_ylabel("Count")
-            plt.tight_layout()
-            st.pyplot(hist_fig)
+            def probability_card() -> None:
+                st.markdown("<div class='section-note'>Review how confidently the model separates low- and high-risk players.</div>", unsafe_allow_html=True)
+                st.plotly_chart(_plotly_probability_hist(probability_frame["churn_probability"].to_numpy()), use_container_width=True)
+            card(probability_card, title="Probability Distribution")
 
-            pie_fig, pie_ax = plt.subplots(figsize=(4.5, 4.5))
-            risk_counts = probability_frame["risk_level"].value_counts().reindex(["Low", "Medium", "High"], fill_value=0)
-            pie_ax.pie(
-                risk_counts.values,
-                labels=risk_counts.index,
-                autopct="%1.1f%%",
-                colors=["#22c55e", "#f59e0b", "#ef4444"],
-                startangle=90,
-            )
-            pie_ax.set_title("Risk Category Split")
-            pie_ax.axis("equal")
-            st.pyplot(pie_fig)
+        lower_row_left, lower_row_right = st.columns(2)
+        with lower_row_left:
+            y_test = evaluation_bundle.get("y_test")
+            y_prob_map = evaluation_bundle.get("y_prob", {})
 
-        st.write("Interactive Risk Filter")
+            def roc_card() -> None:
+                st.markdown("<div class='section-note'>Threshold-independent performance view for the selected model.</div>", unsafe_allow_html=True)
+                if y_test is None or selected_model not in y_prob_map:
+                    st.warning("ROC curve is unavailable until a test split is stored for this model.")
+                    return
+                st.plotly_chart(
+                    _plotly_roc_curve(y_test, np.asarray(y_prob_map[selected_model]), float(selected_metrics["ROC-AUC"])),
+                    use_container_width=True,
+                )
+
+            card(roc_card, title="ROC Curve")
+
+        with lower_row_right:
+            def risk_card() -> None:
+                st.markdown("<div class='section-note'>Operational view of how many players fall into each risk band.</div>", unsafe_allow_html=True)
+                st.plotly_chart(_plotly_risk_distribution(probability_frame), use_container_width=True)
+            card(risk_card, title="Risk Distribution")
+
+        _page_divider()
+        st.markdown("### Interactive Risk Filter")
         prob_range = st.slider(
             "Churn probability range",
             min_value=0.0,
@@ -955,8 +1492,11 @@ def main() -> None:
         if filter_col != "None" and filter_value is not None:
             filtered = filtered[filtered[filter_col].astype(str) == filter_value]
 
-        st.write(f"Filtered players: **{len(filtered):,}**")
-        st.dataframe(filtered.sort_values("churn_probability", ascending=False).head(500), use_container_width=True)
+        _info_banner(f"Filtered players available for export: {len(filtered):,}", icon="🎯")
+        card(
+            lambda: st.dataframe(filtered.sort_values("churn_probability", ascending=False).head(500), use_container_width=True),
+            title="Filtered Risk Table",
+        )
 
         csv_data = filtered.to_csv(index=False).encode("utf-8")
         st.download_button(
@@ -966,7 +1506,6 @@ def main() -> None:
             mime="text/csv",
         )
 
-        st.write("Feature Interpretability")
         tree_model = models[selected_model].named_steps["model"]
         preprocessor = models[selected_model].named_steps["preprocessor"]
         importances = tree_model.feature_importances_
@@ -976,11 +1515,17 @@ def main() -> None:
             .sort_values("importance", ascending=False)
             .head(10)
         )
-        st.dataframe(importance_df, use_container_width=True)
+        card(
+            lambda: st.plotly_chart(_plotly_feature_importance(importance_df), use_container_width=True),
+            title="Feature Importance",
+        )
     elif section == "Player Risk Analysis":
-        st.subheader("Player Risk Analysis")
+        _page_header(
+            "Player Risk Analysis",
+            "Inspect an existing player profile or simulate a new one to understand churn risk at the individual level.",
+        )
         if "trained_models" not in st.session_state:
-            st.info("Train models first from the Model Training section.")
+            _info_banner("Train models first from the Model Training section.", icon="🧠")
             return
 
         models = st.session_state["trained_models"]
@@ -989,21 +1534,26 @@ def main() -> None:
         selected_model_name = st.selectbox("Model for prediction", options=list(models.keys()))
         selected_model = models[selected_model_name]
 
-        st.write("Existing Player Predictor")
-        row_index = st.selectbox("Select player row index", options=bundle["X_model"].index.tolist())
-        st.dataframe(bundle["X_display"].loc[[row_index]], use_container_width=True)
+        def selector_card() -> None:
+            st.markdown("<div class='section-note'>Choose a player from the dataset and score them with the trained model.</div>", unsafe_allow_html=True)
+            selected = st.selectbox("Select player row index", options=bundle["X_model"].index.tolist())
+            st.session_state["_selected_player_row"] = selected
+        card(selector_card, title="Existing Player Predictor")
+        row_index = st.session_state.get("_selected_player_row", bundle["X_model"].index.tolist()[0])
+        card(lambda: st.dataframe(bundle["X_display"].loc[[row_index]], use_container_width=True), title="Player Behavior Snapshot")
 
         if st.button("Predict Selected Player", use_container_width=True):
             selected_row = bundle["X_model"].loc[[row_index]]
             probability = float(selected_model.predict_proba(selected_row)[0, 1])
             risk = _risk_bucket(probability)
-            st.metric("Churn Probability", f"{probability:.4f}")
-            st.markdown(
-                f"<div style='font-size:1.05rem;font-weight:700;color:{_risk_color(risk)};'>Risk Level: {risk}</div>",
-                unsafe_allow_html=True,
-            )
+            risk_cols = st.columns(2)
+            with risk_cols[0]:
+                _metric_panel("Churn Probability", f"{probability:.4f}", note=selected_model_name, accent=_risk_color(risk))
+            with risk_cols[1]:
+                _metric_panel("Risk Level", risk, note="Selected player", accent=_risk_color(risk))
 
-        st.write("Single Player Simulator")
+        _page_divider()
+        st.markdown("### Single Player Simulator")
         numeric_features = bundle["numeric_features"]
         x_model = bundle["X_model"]
 
@@ -1012,15 +1562,17 @@ def main() -> None:
             return
 
         input_values = {}
-        input_cols = st.columns(3)
-        for idx, feature in enumerate(numeric_features):
-            default_value = float(pd.to_numeric(x_model[feature], errors="coerce").median())
-            with input_cols[idx % 3]:
-                input_values[feature] = st.number_input(
-                    feature,
-                    value=default_value if not np.isnan(default_value) else 0.0,
-                    key=f"sim_{feature}",
-                )
+        def simulator_card() -> None:
+            input_cols = st.columns(3)
+            for idx, feature in enumerate(numeric_features):
+                default_value = float(pd.to_numeric(x_model[feature], errors="coerce").median())
+                with input_cols[idx % 3]:
+                    input_values[feature] = st.number_input(
+                        feature,
+                        value=default_value if not np.isnan(default_value) else 0.0,
+                        key=f"sim_{feature}",
+                    )
+        card(simulator_card, title="Simulation Inputs")
 
         simulator_row = {}
         for feature in x_model.columns:
@@ -1037,16 +1589,16 @@ def main() -> None:
 
         sim_col_1, sim_col_2 = st.columns([1, 2])
         with sim_col_1:
-            st.metric("Simulated Churn Probability", f"{sim_probability:.4f}")
+            _metric_panel("Simulated Churn Probability", f"{sim_probability:.4f}", accent=_risk_color(sim_risk))
         with sim_col_2:
-            st.markdown(
-                f"<div style='font-size:1.05rem;font-weight:700;color:{_risk_color(sim_risk)};'>Risk Level: {sim_risk}</div>",
-                unsafe_allow_html=True,
-            )
+            _metric_panel("Simulated Risk Level", sim_risk, note="Behavioral simulation", accent=_risk_color(sim_risk))
     elif section == "Decision Tree Explorer":
-        st.subheader("Decision Tree Explorer")
+        _page_header(
+            "Decision Tree Explorer",
+            "Explore the learned decision path visually and inspect the exact split rules behind the churn model.",
+        )
         if "trained_models" not in st.session_state:
-            st.info("Train models first from the Model Training section.")
+            _info_banner("Train models first from the Model Training section.", icon="🧠")
             return
 
         dt_pipeline = st.session_state["trained_models"]["Decision Tree"]
@@ -1063,50 +1615,69 @@ def main() -> None:
         preprocessor = dt_pipeline.named_steps["preprocessor"]
         feature_names = list(preprocessor.get_feature_names_out())
 
-        fig, ax = plt.subplots(figsize=(20, 10))
-        plot_tree(
-            dt_model,
-            feature_names=feature_names,
-            class_names=["Non-Churn", "Churn"],
-            filled=True,
-            rounded=True,
-            max_depth=view_depth,
-            impurity=False,
-            proportion=True,
-            fontsize=8,
-            ax=ax,
-        )
-        ax.set_title("Decision Tree Explorer")
-        plt.tight_layout()
-        st.pyplot(fig)
+        def tree_card() -> None:
+            fig, ax = plt.subplots(figsize=(20, 10))
+            plot_tree(
+                dt_model,
+                feature_names=feature_names,
+                class_names=["Non-Churn", "Churn"],
+                filled=True,
+                rounded=True,
+                max_depth=view_depth,
+                impurity=False,
+                proportion=True,
+                fontsize=8,
+                ax=ax,
+            )
+            ax.set_title("Decision Tree Explorer")
+            plt.tight_layout()
+            st.pyplot(fig)
+            st.markdown(
+                "<div class='legend-note'>Legend: darker red nodes indicate stronger churn propensity; follow left/right branches to understand threshold logic.</div>",
+                unsafe_allow_html=True,
+            )
+        card(tree_card, title="Tree Visualization")
 
         split_text = export_text(dt_model, feature_names=feature_names, max_depth=view_depth)
-        st.markdown("**Decision Tree feature splits**")
-        st.code(split_text)
+        card(lambda: st.code(split_text), title="Decision Tree Feature Splits")
     elif section == "Engagement Optimization Assistant":
-        st.subheader("Agentic AI Game Engagement Optimization Assistant")
-        st.caption(
-            "Generates a structured engagement optimization report using churn risk predictions and gameplay signals. "
-            "This workflow now includes analysis, retrieval, and summary-first presentation."
+        _page_header(
+            "Engagement Optimization Assistant",
+            "Generate a retrieval-backed retention report for an individual player with structured recommendations and export options.",
         )
 
         if "trained_models" not in st.session_state:
-            st.info("Train a model first from the Model Training section.")
+            _info_banner("Train a model first from the Model Training section.", icon="🧠")
             return
 
         models = st.session_state["trained_models"]
         bundle = st.session_state["data_bundle"]
 
-        selected_model_name = st.selectbox("Model", options=list(models.keys()), key="assistant_model")
+        def assistant_controls() -> None:
+            st.markdown("<div class='chat-heading'>Assistant Inputs</div>", unsafe_allow_html=True)
+            st.markdown(
+                "<div class='chat-copy'>Pick a trained model, choose the player row, and decide how much detail to show in the generated report.</div>",
+                unsafe_allow_html=True,
+            )
+            st.selectbox("Model", options=list(models.keys()), key="assistant_model")
+            st.selectbox(
+                "Select player row index",
+                options=bundle["X_model"].index.tolist(),
+                key="assistant_row",
+            )
+            st.radio(
+                "Presentation mode",
+                ["Executive summary", "Dashboard", "Full details"],
+                horizontal=True,
+                index=0,
+                key="assistant_presentation_mode",
+            )
+        card(assistant_controls, title="Assistant Control Panel")
+
+        selected_model_name = st.session_state["assistant_model"]
         selected_model = models[selected_model_name]
-
         id_col = bundle.get("id_col")
-        row_index = st.selectbox(
-            "Select player row index",
-            options=bundle["X_model"].index.tolist(),
-            key="assistant_row",
-        )
-
+        row_index = st.session_state["assistant_row"]
         player_display_row = bundle["X_display"].loc[row_index]
 
         player_identifier = None
@@ -1117,13 +1688,7 @@ def main() -> None:
                 player_identifier = None
         if not player_identifier:
             player_identifier = f"row_{row_index}"
-
-        presentation_mode = st.radio(
-            "Presentation mode",
-            ["Executive summary", "Dashboard", "Full details"],
-            horizontal=True,
-            index=0,
-        )
+        presentation_mode = st.session_state["assistant_presentation_mode"]
 
         with st.expander("Player snapshot", expanded=False):
             st.dataframe(bundle["X_display"].loc[[row_index]], use_container_width=True)
@@ -1145,10 +1710,13 @@ def main() -> None:
                     player_identifier=player_identifier,
                 )
 
+                st.markdown("<div class='chat-shell'>", unsafe_allow_html=True)
                 _render_risk_badge(report.churn_risk_interpretation["risk_level"], report.churn_risk_interpretation["risk_probability"])
                 _render_quality_summary(report)
                 st.caption("Workflow mode: retrieval-backed recommendations only.")
                 _render_hero_card(report)
+                _render_report_exports(report, player_identifier)
+                _page_divider()
 
                 if presentation_mode == "Executive summary":
                     _render_executive_summary(report)
@@ -1172,6 +1740,7 @@ def main() -> None:
                             for note in report.data_quality_notes[:3]:
                                 st.write(f"- {note}")
                     _render_full_details(report, state, player_identifier)
+                st.markdown("</div>", unsafe_allow_html=True)
             except Exception as exc:
                 st.error(f"Failed to generate report: {exc}")
 
