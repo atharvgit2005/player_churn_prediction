@@ -2,4 +2,8 @@ streamlit==1.54.0
 pandas==2.3.3
 numpy==2.4.2
 matplotlib==3.10.8
+plotly==6.3.0
 scikit-learn==1.8.0
+reportlab==4.4.4
+pypdf==6.1.1
+pytest==8.4.2

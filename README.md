@@ -60,3 +60,42 @@ streamlit run app.py
 2. Train a model in **Model Training**.
 3. Open **Engagement Optimization Assistant** in the sidebar.
 4. Select a player row and generate the report.
+
+## Milestone 2
+
+### Run the updated app
+1. Create and activate a virtual environment:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+2. Install the dependencies:
+```bash
+pip install -r requirements.txt
+```
+3. Launch the Streamlit app:
+```bash
+streamlit run app.py
+```
+
+### Trigger PDF export
+1. Open **Engagement Optimization Assistant** from the sidebar.
+2. Select a trained model and a player row.
+3. Click **Generate Engagement Optimization Report**.
+4. Use the **Download as PDF** button shown below the hero summary.
+
+The selected player needs enough data to build the assistant report. At minimum, the workflow expects a trained model prediction plus player-level gameplay features such as sessions, session duration, progression, genre, or engagement-level fields. If any mandatory report section is empty, PDF export is blocked and the UI lists the missing sections.
+
+### Run the new tests
+Run the full test suite with:
+```bash
+pytest
+```
+
+### New dependencies
+Install the new packages with:
+```bash
+pip install reportlab pypdf pytest
+```
+
+These are also included in `requirements.txt`.
