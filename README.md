@@ -10,9 +10,10 @@ This project lets you upload a player dataset, train churn models, evaluate mode
 This repo now includes an **Agentic AI Game Engagement Optimization Assistant** that:
 - Interprets churn risk predictions for a selected player
 - Summarizes observable engagement/progression/monetization signals
+- Retrieves relevant retention strategies from a local knowledge base
 - Produces a **structured engagement optimization report** with recommendations, references, and ethical disclaimers
 
-In this first milestone commit, recommendations are **conservative heuristics** with an explicit state/audit trail. (Retrieval-backed references + optional LLM integration are planned in follow-up commits.)
+The assistant uses an explicit state/audit trail and only promotes recommendations that are supported by player signals or retrieved strategies.
 
 ## Tech Stack
 - Python
