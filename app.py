@@ -485,6 +485,208 @@ def _render_risk_badge(risk_level: str, probability: float) -> None:
     )
 
 
+def _truncate_text(value: object, max_chars: int = 140) -> str:
+    text = " ".join(str(value).split())
+    if len(text) <= max_chars:
+        return text
+    return text[: max_chars - 1].rstrip() + "…"
+
+
+def _render_chip_row(items: List[str], accent: str = "#0f172a") -> None:
+    if not items:
+        return
+    chips = "".join(
+        f"<span style='display:inline-block;padding:0.18rem 0.55rem;margin:0 0.35rem 0.35rem 0;"
+        f"border-radius:999px;background:{accent}14;border:1px solid {accent}33;color:{accent};"
+        f"font-size:0.78rem;font-weight:600;'>{item}</span>"
+        for item in items
+    )
+    st.markdown(chips, unsafe_allow_html=True)
+
+
+def _render_summary_card(label: str, value: str, note: Optional[str] = None, accent: str = "#2563eb") -> None:
+    with st.container(border=True):
+        st.markdown(
+            f"<div style='font-size:0.8rem;letter-spacing:0.06em;text-transform:uppercase;color:{accent};font-weight:700;'>{label}</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(f"<div style='font-size:1.25rem;font-weight:800;margin-top:0.15rem;'>{value}</div>", unsafe_allow_html=True)
+        if note:
+            st.caption(note)
+
+
+def _render_recommendation_preview(rec, index: int) -> None:
+    with st.container(border=True):
+        title_cols = st.columns([3, 1])
+        with title_cols[0]:
+            st.markdown(f"**{index}. {rec.title}**")
+        with title_cols[1]:
+            st.caption(rec.effort)
+
+        st.write(_truncate_text(rec.rationale, 170))
+        st.write(f"Expected impact: {_truncate_text(rec.expected_impact, 120)}")
+        _render_chip_row([rec.risk] + rec.metrics_to_track[:2], accent="#0f766e")
+
+        if rec.supporting_signals:
+            st.caption("Signals: " + ", ".join(rec.supporting_signals[:2]))
+
+        with st.expander("Details", expanded=False):
+            if rec.action_steps:
+                st.markdown("**Action steps**")
+                for step in rec.action_steps[:3]:
+                    st.write(f"- {step}")
+            if rec.metrics_to_track:
+                st.markdown("**Metrics to track**")
+                st.write(", ".join(rec.metrics_to_track))
+            if rec.references:
+                st.markdown("**References**")
+                for ref in rec.references:
+                    if ref.url:
+                        st.markdown(f"- [{ref.title}]({ref.url}) ({ref.source})")
+                    else:
+                        st.write(f"- {ref.title} ({ref.source})")
+            if rec.uncertainty_notes:
+                st.markdown("**Uncertainty notes**")
+                for note in rec.uncertainty_notes:
+                    st.write(f"- {note}")
+
+
+def _render_strategies_preview(report) -> None:
+    if not report.retrieved_strategies:
+        return
+
+    with st.expander("Retrieved strategies", expanded=False):
+        for strategy in report.retrieved_strategies:
+            with st.container(border=True):
+                st.markdown(f"**{strategy.title}**")
+                st.caption(f"{strategy.source} · score {strategy.score:.2f}")
+                st.write(_truncate_text(strategy.when_to_use, 180))
+                if strategy.matched_signals:
+                    _render_chip_row(strategy.matched_signals[:3], accent="#7c3aed")
+                if strategy.url:
+                    st.markdown(f"[Open source]({strategy.url})")
+
+
+def _render_quality_summary(report) -> None:
+    summary_cols = st.columns(4)
+    summary_cols[0].metric("Risk", f"{report.churn_risk_interpretation['risk_level']} ({report.churn_risk_interpretation['risk_probability']:.0%})")
+    summary_cols[1].metric("Mode", report.workflow_mode.title())
+    summary_cols[2].metric("Retrieved", f"{len(report.retrieved_strategies)}")
+    summary_cols[3].metric("Data Coverage", f"{report.analysis_summary.get('coverage_score', 0.0):.0%}")
+
+    status_bits = []
+    status_bits.append("Retrieval-backed")
+    if report.data_quality_notes:
+        status_bits.append("Some noisy data")
+    _render_chip_row(status_bits, accent="#1d4ed8")
+
+
+def _render_hero_card(report) -> None:
+    top_rec = report.engagement_and_retention_recommendations[0] if report.engagement_and_retention_recommendations else None
+    accent = _risk_color(report.churn_risk_interpretation.get("risk_level", "Medium"))
+    hero_style = f"""
+        <div style="
+            padding: 1.45rem 1.55rem;
+            border-radius: 1.15rem;
+            background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, {accent}12 100%);
+            border: 1px solid {accent}28;
+            box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+            margin: 0.25rem 0 0.35rem 0;
+        ">
+            <div style="font-size:0.75rem;letter-spacing:0.16em;text-transform:uppercase;color:{accent};font-weight:800;">
+                Executive focus
+            </div>
+            <div style="font-size:1.3rem;font-weight:850;margin-top:0.35rem;color:#0f172a;line-height:1.2;">
+                {top_rec.title if top_rec else 'No recommendation generated'}
+            </div>
+            <div style="margin-top:0.55rem;color:#334155;line-height:1.55;font-size:0.98rem;max-width:62ch;">
+                {_truncate_text(top_rec.rationale, 180) if top_rec else 'The assistant did not generate a recommendation for this player.'}
+            </div>
+        </div>
+    """
+    with st.container():
+        st.markdown(hero_style, unsafe_allow_html=True)
+        if top_rec:
+            chips = [
+                f"Effort: {top_rec.effort}",
+                f"Risk: {top_rec.risk}",
+                f"Confidence: {int((top_rec.confidence or 0.0) * 100)}%",
+            ]
+            _render_chip_row(chips, accent=accent)
+
+
+def _render_dashboard_cards(report) -> None:
+    top_recommendations = report.engagement_and_retention_recommendations[:3]
+    if not top_recommendations:
+        st.info("No recommendations were generated for this player.")
+        return
+
+    card_count = min(3, len(top_recommendations))
+    rec_cols = st.columns(card_count)
+    for idx, rec in enumerate(top_recommendations):
+        with rec_cols[idx]:
+            _render_recommendation_preview(rec, idx + 1)
+
+
+def _render_executive_summary(report) -> None:
+    top_rec = report.engagement_and_retention_recommendations[0] if report.engagement_and_retention_recommendations else None
+    st.markdown("### Summary")
+    summary_cols = st.columns(3)
+    summary_cols[0].metric("Risk", f"{report.churn_risk_interpretation['risk_level']} ({report.churn_risk_interpretation['risk_probability']:.0%})")
+    summary_cols[1].metric("Data coverage", f"{report.analysis_summary.get('coverage_score', 0.0):.0%}")
+    summary_cols[2].metric("Retrieved strategies", f"{len(report.retrieved_strategies)}")
+
+    if top_rec:
+        st.markdown("### Next Best Action")
+        _render_recommendation_preview(top_rec, 1)
+
+    if report.data_quality_notes:
+        with st.expander("Data quality notes", expanded=False):
+            for note in report.data_quality_notes[:4]:
+                st.write(f"- {note}")
+
+
+def _render_full_details(report, state, player_identifier: str) -> None:
+    with st.expander("Full analysis", expanded=True):
+        st.markdown("**Player behavior summary**")
+        st.json(report.player_behavior_summary)
+        st.markdown("**Churn risk interpretation**")
+        st.json(report.churn_risk_interpretation)
+        st.markdown("**Analysis summary**")
+        st.json(report.analysis_summary)
+
+    _render_strategies_preview(report)
+
+    with st.expander("Supporting references", expanded=False):
+        for ref in report.supporting_references:
+            if ref.url:
+                st.markdown(f"- [{ref.title}]({ref.url}) ({ref.source})")
+            else:
+                st.write(f"- {ref.title} ({ref.source})")
+
+    if report.data_quality_notes:
+        with st.expander("Data quality notes", expanded=False):
+            for note in report.data_quality_notes:
+                st.write(f"- {note}")
+
+    with st.expander("Ethics and UX notes", expanded=False):
+        for disclaimer in report.ethical_and_ux_disclaimers:
+            st.write(f"- {disclaimer}")
+
+    with st.expander("Agent state / audit trail", expanded=False):
+        st.write(f"Current step: `{state.step}`")
+        st.json([e.__dict__ for e in state.events])
+
+    report_json = report.to_dict()
+    st.download_button(
+        "Download Report (JSON)",
+        data=json.dumps(report_json, indent=2, ensure_ascii=True),
+        file_name=f"engagement_optimization_report_{player_identifier}.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+
+
 def main() -> None:
     st.set_page_config(
         page_title="Player Churn Dashboard",
@@ -522,6 +724,7 @@ def main() -> None:
 
     if section == "Upload Data":
         st.subheader("Data Overview")
+
         if df is None:
             st.info("Upload a CSV file from the sidebar to begin.")
             return
@@ -851,7 +1054,7 @@ def main() -> None:
         st.subheader("Agentic AI Game Engagement Optimization Assistant")
         st.caption(
             "Generates a structured engagement optimization report using churn risk predictions and gameplay signals. "
-            "This milestone ships with an explicit-state agent workflow and conservative heuristics; retrieval + LLM are added in later commits."
+            "This workflow now includes analysis, retrieval, and summary-first presentation."
         )
 
         if "trained_models" not in st.session_state:
@@ -872,8 +1075,6 @@ def main() -> None:
         )
 
         player_display_row = bundle["X_display"].loc[row_index]
-        st.write("Player Snapshot")
-        st.dataframe(bundle["X_display"].loc[[row_index]], use_container_width=True)
 
         player_identifier = None
         if id_col and id_col in bundle["X_display"].columns:
@@ -883,6 +1084,16 @@ def main() -> None:
                 player_identifier = None
         if not player_identifier:
             player_identifier = f"row_{row_index}"
+
+        presentation_mode = st.radio(
+            "Presentation mode",
+            ["Executive summary", "Dashboard", "Full details"],
+            horizontal=True,
+            index=0,
+        )
+
+        with st.expander("Player snapshot", expanded=False):
+            st.dataframe(bundle["X_display"].loc[[row_index]], use_container_width=True)
 
         if st.button("Generate Engagement Optimization Report", type="primary", use_container_width=True):
             try:
@@ -901,53 +1112,33 @@ def main() -> None:
                     player_identifier=player_identifier,
                 )
 
-                st.markdown("**Player Behavior Summary**")
-                st.json(report.player_behavior_summary)
+                _render_risk_badge(report.churn_risk_interpretation["risk_level"], report.churn_risk_interpretation["risk_probability"])
+                _render_quality_summary(report)
+                st.caption("Workflow mode: retrieval-backed recommendations only.")
+                _render_hero_card(report)
 
-                st.markdown("**Churn Risk Interpretation**")
-                st.json(report.churn_risk_interpretation)
-
-                st.markdown("**Engagement & Retention Recommendations**")
-                for idx, rec in enumerate(report.engagement_and_retention_recommendations, start=1):
-                    with st.expander(f"{idx}. {rec.title}", expanded=(idx == 1)):
-                        st.write(f"**Rationale:** {rec.rationale}")
-                        st.write(f"**Expected impact:** {rec.expected_impact}")
-                        st.write(f"**Effort:** {rec.effort}")
-                        st.write(f"**Risk:** {rec.risk}")
-                        if rec.metrics_to_track:
-                            st.write("**Metrics to track:**")
-                            st.write(", ".join(rec.metrics_to_track))
-                        if rec.references:
-                            st.write("**References:**")
-                            for ref in rec.references:
-                                st.write(f"- {ref.title} ({ref.source})")
-
-                st.markdown("**Supporting References**")
-                for ref in report.supporting_references:
-                    st.write(f"- {ref.title} ({ref.source})")
-
-                if report.data_quality_notes:
-                    st.markdown("**Data Quality Notes**")
-                    for note in report.data_quality_notes:
-                        st.write(f"- {note}")
-
-                st.markdown("**Ethical & User-Experience Disclaimers**")
-                for disclaimer in report.ethical_and_ux_disclaimers:
-                    st.write(f"- {disclaimer}")
-
-                with st.expander("Agent State / Audit Trail", expanded=False):
-                    st.write(f"Current step: `{state.step}`")
-                    st.json([e.__dict__ for e in state.events])
-
-                # Download a JSON copy for submission / reproducibility.
-                report_json = report.to_dict()
-                st.download_button(
-                    "Download Report (JSON)",
-                    data=json.dumps(report_json, indent=2, ensure_ascii=True),
-                    file_name=f"engagement_optimization_report_{player_identifier}.json",
-                    mime="application/json",
-                    use_container_width=True,
-                )
+                if presentation_mode == "Executive summary":
+                    _render_executive_summary(report)
+                elif presentation_mode == "Dashboard":
+                    st.markdown("### Top actions")
+                    _render_dashboard_cards(report)
+                    with st.expander("Why these recommendations?", expanded=False):
+                        st.write(_truncate_text(report.analysis_summary.get("risk_summary", {}).get("risk_text", ""), 240))
+                        if report.data_quality_notes:
+                            st.write("Data quality notes:")
+                            for note in report.data_quality_notes[:3]:
+                                st.write(f"- {note}")
+                    _render_strategies_preview(report)
+                else:
+                    st.markdown("### Top actions")
+                    _render_dashboard_cards(report)
+                    with st.expander("Why these recommendations?", expanded=False):
+                        st.write(_truncate_text(report.analysis_summary.get("risk_summary", {}).get("risk_text", ""), 240))
+                        if report.data_quality_notes:
+                            st.write("Data quality notes:")
+                            for note in report.data_quality_notes[:3]:
+                                st.write(f"- {note}")
+                    _render_full_details(report, state, player_identifier)
             except Exception as exc:
                 st.error(f"Failed to generate report: {exc}")
 
