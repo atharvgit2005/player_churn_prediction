@@ -39,11 +39,11 @@ warnings.filterwarnings("ignore")
 RANDOM_STATE = 42
 SAMPLE_DATASET_PATH = Path(__file__).with_name("online_gaming_behavior_dataset.csv")
 ACCENT_COLOR = "#FF4B4B"
-BG_COLOR = "#0F0F0F"
-SURFACE_COLOR = "#1A1A1A"
+BG_COLOR = "#080808"
+SURFACE_COLOR = "#131313"
 BORDER_COLOR = "#2A2A2A"
-TEXT_PRIMARY = "#F5F5F5"
-TEXT_MUTED = "#888888"
+TEXT_PRIMARY = "#E5E2E1"
+TEXT_MUTED = "#7E7A7A"
 
 
 def _inject_global_styles() -> None:
@@ -52,174 +52,290 @@ def _inject_global_styles() -> None:
         <style>
         #MainMenu {{visibility: hidden;}}
         footer {{visibility: hidden;}}
-        header {{visibility: hidden;}}
+        header {{
+            background: transparent !important;
+        }}
         .stApp {{
             background: {BG_COLOR};
             color: {TEXT_PRIMARY};
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }}
         [data-testid="stAppViewContainer"] {{
-            background: radial-gradient(circle at top right, rgba(255,75,75,0.10), transparent 20%), {BG_COLOR};
+            background:
+                radial-gradient(circle at top right, rgba(255,49,49,0.08), transparent 22%),
+                radial-gradient(circle at 2px 2px, rgba(255,255,255,0.02) 1px, transparent 0),
+                {BG_COLOR};
+            background-size: auto, 38px 38px, auto;
         }}
         [data-testid="stMainBlockContainer"] {{
-            max-width: 1380px;
-            padding-top: 1.2rem;
+            max-width: 1560px;
+            padding-top: 0.9rem;
             padding-bottom: 2rem;
-            padding-left: 1.4rem;
-            padding-right: 1.4rem;
-        }}
-        [data-testid="stSidebar"] {{
-            background: #111111;
-            border-right: 1px solid {BORDER_COLOR};
-        }}
-        [data-testid="stSidebar"] .block-container {{
-            padding-top: 1rem;
             padding-left: 1rem;
             padding-right: 1rem;
         }}
-        [data-testid="stSidebar"] label,
-        [data-testid="stSidebar"] p,
-        [data-testid="stSidebar"] div {{
-            color: {TEXT_PRIMARY};
+        [data-testid="stMainBlockContainer"] > [data-testid="stHorizontalBlock"]:first-of-type {{
+            align-items: flex-start;
         }}
-        .sidebar-wordmark {{
-            font-size: 1.55rem;
-            font-weight: 800;
-            color: {TEXT_PRIMARY};
-            letter-spacing: -0.03em;
-            margin-bottom: 0.15rem;
+        [data-testid="stMainBlockContainer"] > [data-testid="stHorizontalBlock"]:first-of-type > div:nth-child(1) {{
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 260px;
+            overflow-y: auto;
+            background: #080808;
+            z-index: 100;
+            padding: 1.5rem 1rem;
+            border-right: 1px solid #1E2530;
         }}
-        .sidebar-subtitle {{
+        [data-testid="stMainBlockContainer"] > [data-testid="stHorizontalBlock"]:first-of-type > div:nth-child(2) {{
+            margin-left: 260px;
+            padding: 1.5rem;
+            width: calc(100% - 260px);
+            max-width: calc(100% - 260px);
+        }}
+        [data-testid="stSidebar"] {{
+            display: none;
+        }}
+        .shell-nav {{
+            position: sticky;
+            top: 0.8rem;
+        }}
+        .nav-wordmark {{
+            font-size: 1.4rem;
+            font-weight: 900;
+            color: {ACCENT_COLOR};
+            letter-spacing: -0.02em;
+        }}
+        .nav-subtitle {{
             color: {TEXT_MUTED};
-            font-size: 0.92rem;
-            margin-bottom: 1rem;
-        }}
-        .sidebar-label {{
-            color: {TEXT_MUTED};
-            font-size: 0.72rem;
-            letter-spacing: 0.16em;
-            font-weight: 700;
             text-transform: uppercase;
-            margin: 0.4rem 0 0.5rem 0;
+            letter-spacing: 0.24em;
+            font-size: 0.6rem;
+            font-weight: 800;
+            margin-top: 0.15rem;
         }}
-        .sidebar-divider {{
-            height: 1px;
-            background: {BORDER_COLOR};
-            margin: 0.8rem 0 1rem 0;
+        .panel-label {{
+            color: {TEXT_MUTED};
+            font-size: 0.64rem;
+            letter-spacing: 0.24em;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin: 0.2rem 0 0.65rem 0;
+        }}
+        .redline {{
+            height: 2px;
+            background: linear-gradient(90deg, {ACCENT_COLOR} 0%, rgba(255,49,49,0.08) 88%);
+            margin: 1rem 0 1.1rem 0;
+        }}
+        .topbar {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(18,18,18,0.86);
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            position: sticky;
+            top: 0;
+            z-index: 99;
+            backdrop-filter: blur(12px);
+        }}
+        .topbar-search {{
+            background: #080808;
+            padding: 0.55rem 0.8rem;
+            color: {TEXT_MUTED};
+            font-size: 0.82rem;
+            font-weight: 600;
+            min-width: 18rem;
         }}
         [data-testid="stRadio"] label {{
             background: transparent;
-            border: 1px solid transparent;
-            border-radius: 8px;
-            padding: 0.55rem 0.75rem;
-            margin-bottom: 0.2rem;
+            border: none;
+            border-left: 2px solid transparent;
+            border-radius: 0;
+            padding: 0.85rem 0.75rem;
+            margin-bottom: 0.15rem;
+            transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
         }}
         [data-testid="stRadio"] label:hover {{
-            background: rgba(255,255,255,0.04);
-            border-color: {BORDER_COLOR};
+            background: #1c1b1b;
+            border-color: rgba(255,49,49,0.32);
         }}
-        div[role="radiogroup"] > label[data-baseweb="radio"] > div:first-child {{
+        [data-testid="stRadio"] label[data-baseweb="radio"] {{
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            color: {TEXT_PRIMARY};
+            transform: none;
+        }}
+        [data-testid="stRadio"] label[data-baseweb="radio"] > div:first-child {{
             display: none;
+        }}
+        [data-testid="stRadio"] [data-baseweb="radio"] > div:first-child {{
+            display: none !important;
+        }}
+        [data-testid="stRadio"] label {{
+            width: 100% !important;
+            padding: 0.7rem 0.75rem !important;
+            border-left: 2px solid transparent !important;
+            border-radius: 0 !important;
+            transition: all 0.15s ease !important;
+        }}
+        [data-testid="stRadio"] label:has(input:checked) {{
+            border-left-color: #FF4B4B !important;
+            background: rgba(255,75,75,0.08) !important;
+        }}
+        [data-testid="stRadio"] label[data-baseweb="radio"] p {{
+            color: {TEXT_PRIMARY} !important;
+            font-size: 0.88rem;
+            font-weight: 600;
+            margin: 0;
+            letter-spacing: 0.01em;
+            text-transform: none;
+        }}
+        [data-testid="stSlider"] [data-baseweb="slider"] [role="slider"] {{
+            background: #FF4B4B !important;
+            box-shadow: 0 0 8px rgba(255,75,75,0.5) !important;
+        }}
+        [data-testid="stSlider"] [data-baseweb="slider"] div[class*="Track"] {{
+            background: #1E2530 !important;
+        }}
+        [data-testid="stSelectbox"] select,
+        [data-baseweb="select"] > div {{
+            background: #111519 !important;
+            border: 1px solid #2A2A2A !important;
+            border-radius: 0 !important;
+            color: #F0F4F8 !important;
+        }}
+        [data-testid="stSelectbox"] [data-baseweb="select"]:focus-within > div,
+        [data-baseweb="select"]:focus-within > div {{
+            border-color: #FF4B4B !important;
+            box-shadow: none !important;
+        }}
+        [data-testid="stProgressBar"] > div > div {{
+            background: #FF4B4B !important;
         }}
         .card {{
             background: linear-gradient(180deg, rgba(26,26,26,0.95), rgba(18,18,18,0.95));
-            border: 1px solid {BORDER_COLOR};
-            border-radius: 18px;
-            padding: 1rem 1rem 0.9rem 1rem;
-            box-shadow: 0 12px 32px rgba(0,0,0,0.22);
+            border: none;
+            border-left: 2px solid rgba(255,49,49,0.24);
+            border-radius: 0;
+            padding: 1rem;
             margin-bottom: 1rem;
         }}
         .card-title {{
             color: {TEXT_PRIMARY};
-            font-size: 1rem;
-            font-weight: 700;
-            margin: 0 0 0.3rem 0;
+            font-size: 0.74rem;
+            font-weight: 900;
+            margin: 0 0 0.8rem 0;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
         }}
         .page-title {{
             color: {TEXT_PRIMARY};
-            font-size: 2rem;
-            font-weight: 800;
-            letter-spacing: -0.03em;
+            font-size: 2.8rem;
+            font-weight: 900;
+            letter-spacing: -0.04em;
             margin: 0;
+            text-transform: uppercase;
+            font-style: italic;
         }}
         .page-subtitle {{
             color: {TEXT_MUTED};
-            font-size: 1rem;
-            margin-top: 0.35rem;
+            font-size: 0.84rem;
+            margin-top: 0.55rem;
             margin-bottom: 1.1rem;
             max-width: 68ch;
+            text-transform: uppercase;
+            letter-spacing: 0.16em;
+            font-weight: 700;
         }}
         .section-note {{
             color: {TEXT_MUTED};
-            font-size: 0.9rem;
+            font-size: 0.84rem;
             margin-bottom: 0.6rem;
         }}
         .info-banner {{
-            border-left: 4px solid {ACCENT_COLOR};
-            background: rgba(255,255,255,0.03);
-            border-radius: 12px;
+            border-left: 2px solid {ACCENT_COLOR};
+            background: #121212;
+            border-radius: 0;
             padding: 0.9rem 1rem;
             color: {TEXT_PRIMARY};
             margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-size: 0.78rem;
+            font-weight: 700;
         }}
         .metric-panel {{
             background: {SURFACE_COLOR};
-            border: 1px solid {BORDER_COLOR};
-            border-left: 4px solid {ACCENT_COLOR};
-            border-radius: 16px;
+            border: none;
+            border-left: 2px solid {ACCENT_COLOR};
+            border-radius: 0;
             padding: 0.9rem 1rem;
         }}
         .metric-panel .metric-label {{
             color: {TEXT_MUTED};
-            font-size: 0.76rem;
+            font-size: 0.62rem;
             text-transform: uppercase;
-            letter-spacing: 0.12em;
-            font-weight: 700;
+            letter-spacing: 0.22em;
+            font-weight: 900;
         }}
         .metric-panel .metric-value {{
             color: {TEXT_PRIMARY};
-            font-size: 1.45rem;
-            font-weight: 800;
-            margin-top: 0.28rem;
+            font-size: 2rem;
+            font-weight: 900;
+            margin-top: 0.45rem;
+            letter-spacing: -0.04em;
         }}
         .metric-panel .metric-note {{
             color: {TEXT_MUTED};
-            font-size: 0.82rem;
-            margin-top: 0.18rem;
+            font-size: 0.74rem;
+            margin-top: 0.4rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
         }}
         .step-row {{
             display: grid;
             grid-template-columns: repeat(4, 1fr);
-            gap: 0.7rem;
+            gap: 0.45rem;
             margin: 0.35rem 0 0.9rem 0;
         }}
         .step-chip {{
-            border: 1px solid {BORDER_COLOR};
-            border-radius: 14px;
+            border: none;
+            border-left: 2px solid rgba(255,255,255,0.06);
+            border-radius: 0;
             padding: 0.75rem 0.85rem;
-            background: rgba(255,255,255,0.02);
+            background: #121212;
         }}
         .step-chip.active {{
-            border-color: rgba(255,75,75,0.55);
-            background: rgba(255,75,75,0.10);
+            border-color: rgba(255,49,49,0.75);
+            background: rgba(255,49,49,0.08);
         }}
         .step-chip.done {{
-            border-color: rgba(34,197,94,0.45);
-            background: rgba(34,197,94,0.08);
+            border-color: rgba(255,49,49,0.28);
+            background: #121212;
         }}
         .step-chip .step-title {{
             color: {TEXT_PRIMARY};
-            font-size: 0.9rem;
-            font-weight: 700;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
         }}
         .step-chip .step-copy {{
             color: {TEXT_MUTED};
-            font-size: 0.8rem;
-            margin-top: 0.2rem;
+            font-size: 0.7rem;
+            margin-top: 0.34rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
         }}
         .chat-shell {{
             background: linear-gradient(180deg, rgba(26,26,26,0.95), rgba(18,18,18,0.98));
-            border: 1px solid {BORDER_COLOR};
-            border-radius: 18px;
+            border: none;
+            border-left: 2px solid rgba(255,49,49,0.35);
+            border-radius: 0;
             padding: 1rem;
             margin-bottom: 1rem;
         }}
@@ -249,58 +365,77 @@ def _inject_global_styles() -> None:
         }}
         div.stButton > button,
         div.stDownloadButton > button {{
-            background: {ACCENT_COLOR};
+            background: #FF4B4B;
             color: white;
-            border: 1px solid rgba(255,255,255,0.04);
-            border-radius: 12px;
-            font-weight: 700;
-            padding: 0.55rem 0.9rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding: 0.65rem 1rem;
+            text-transform: none;
+            letter-spacing: normal;
+            box-shadow: none;
         }}
         div.stButton > button:hover,
         div.stDownloadButton > button:hover {{
-            background: #ff6666;
-            border-color: rgba(255,255,255,0.08);
+            background: #ff625c;
         }}
         div.stButton > button[kind="secondary"],
         button[kind="secondary"] {{
-            background: transparent;
+            background: #1c1b1b;
             color: {TEXT_PRIMARY};
-            border: 1px solid {BORDER_COLOR};
+            border: none;
+            box-shadow: none;
         }}
         [data-testid="stFileUploader"] section {{
-            background: {SURFACE_COLOR};
-            border: 1px dashed {BORDER_COLOR};
-            border-radius: 14px;
+            background: #121212;
+            border: none;
+            border-left: 2px solid rgba(255,49,49,0.25);
+            border-radius: 0;
             padding: 0.65rem;
         }}
         [data-testid="stDataFrame"] {{
-            border: 1px solid {BORDER_COLOR};
-            border-radius: 16px;
+            border: none;
+            border-left: 2px solid rgba(255,49,49,0.25);
+            border-radius: 0;
             overflow: hidden;
         }}
         [data-testid="stDataFrame"] thead tr th {{
-            background: #141414 !important;
+            background: #121212 !important;
             color: {TEXT_PRIMARY} !important;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            font-size: 0.68rem !important;
         }}
         [data-testid="stDataFrame"] tbody tr:nth-child(even) td {{
             background: rgba(255,255,255,0.02) !important;
         }}
+        div[data-testid="stVerticalBlockBorderWrapper"] {{
+            background: linear-gradient(180deg, rgba(19,19,19,0.98), rgba(14,14,14,0.98));
+            border: none !important;
+            border-left: 2px solid rgba(255,49,49,0.22);
+            border-radius: 0 !important;
+            padding: 0.2rem 0.25rem;
+        }}
         [data-testid="stMetric"] {{
             background: {SURFACE_COLOR};
-            border: 1px solid {BORDER_COLOR};
-            border-left: 4px solid {ACCENT_COLOR};
+            border: none;
+            border-left: 2px solid {ACCENT_COLOR};
             padding: 0.9rem 0.95rem;
-            border-radius: 16px;
+            border-radius: 0;
         }}
         [data-testid="stExpander"] {{
-            border: 1px solid {BORDER_COLOR};
-            border-radius: 14px;
-            background: rgba(255,255,255,0.02);
+            border: none;
+            border-left: 2px solid rgba(255,49,49,0.18);
+            border-radius: 0;
+            background: #121212;
         }}
         .legend-note {{
             color: {TEXT_MUTED};
             font-size: 0.86rem;
             margin-top: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
         }}
         </style>
         """,
@@ -309,11 +444,12 @@ def _inject_global_styles() -> None:
 
 
 def card(content_fn, title: Optional[str] = None) -> None:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    if title:
-        st.markdown(f'<p class="card-title">{title}</p>', unsafe_allow_html=True)
-    content_fn()
-    st.markdown("</div>", unsafe_allow_html=True)
+    with st.container(border=False):
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
+        if title:
+            st.markdown(f"<p class='card-title'>{title}</p>", unsafe_allow_html=True)
+        content_fn()
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def _page_header(title: str, subtitle: str) -> None:
@@ -325,8 +461,9 @@ def _sidebar_label(text: str) -> None:
     st.sidebar.markdown(f"<div class='sidebar-label'>{text}</div>", unsafe_allow_html=True)
 
 
-def _info_banner(text: str, icon: str = "ℹ️") -> None:
-    st.markdown(f"<div class='info-banner'>{icon} {text}</div>", unsafe_allow_html=True)
+def _info_banner(text: str, icon: str = "") -> None:
+    prefix = f"{icon} " if icon else ""
+    st.markdown(f"<div class='info-banner'>{prefix}{text}</div>", unsafe_allow_html=True)
 
 
 def _metric_panel(label: str, value: str, note: Optional[str] = None, accent: str = ACCENT_COLOR) -> None:
@@ -1123,7 +1260,7 @@ def _render_report_exports(report, player_identifier: str) -> None:
     export_cols = st.columns(2)
     with export_cols[0]:
         st.download_button(
-            "⬇️ Download Report (JSON)",
+            "Download Report (JSON)",
             data=json.dumps(report_json, indent=2, ensure_ascii=True),
             file_name=f"engagement_optimization_report_{player_identifier}.json",
             mime="application/json",
@@ -1136,7 +1273,7 @@ def _render_report_exports(report, player_identifier: str) -> None:
         else:
             pdf_bytes = generate_report_pdf_bytes(payload)
             st.download_button(
-                "📄 Download as PDF",
+                "Download as PDF",
                 data=pdf_bytes,
                 file_name=f"engagement_optimization_report_{player_identifier}.pdf",
                 mime="application/pdf",
@@ -1144,63 +1281,7 @@ def _render_report_exports(report, player_identifier: str) -> None:
             )
 
 
-def main() -> None:
-    st.set_page_config(
-        page_title="ChurnIQ",
-        page_icon="⚡",
-        layout="wide",
-        initial_sidebar_state="expanded",
-    )
-    _inject_global_styles()
-
-    st.sidebar.markdown("<div class='sidebar-wordmark'>⚡ ChurnIQ</div>", unsafe_allow_html=True)
-    st.sidebar.markdown("<div class='sidebar-subtitle'>Player Analytics Platform</div>", unsafe_allow_html=True)
-    st.sidebar.markdown("<div class='sidebar-divider'></div>", unsafe_allow_html=True)
-    _sidebar_label("Navigation")
-    section = st.sidebar.radio(
-        "Go to",
-        [
-            "Upload Data",
-            "Model Training",
-            "Model Evaluation",
-            "Player Risk Analysis",
-            "Decision Tree Explorer",
-            "Engagement Optimization Assistant",
-        ],
-        label_visibility="collapsed",
-    )
-    st.sidebar.markdown("<div class='sidebar-divider'></div>", unsafe_allow_html=True)
-    _sidebar_label("Data")
-    uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
-    if st.sidebar.button("Use Sample Dataset", type="primary", use_container_width=True, key="sidebar_use_sample_dataset"):
-        try:
-            sample_df = load_sample_data()
-            st.session_state["raw_df"] = sample_df
-            st.session_state["dataset_source"] = "sample"
-            st.session_state["dataset_name"] = SAMPLE_DATASET_PATH.name
-            st.session_state["dataset_size_bytes"] = SAMPLE_DATASET_PATH.stat().st_size
-            st.sidebar.success("Sample dataset loaded.")
-            st.rerun()
-        except Exception as exc:
-            st.sidebar.error(f"Failed to load sample dataset: {exc}")
-
-    df = None
-    if uploaded_file is not None:
-        try:
-            df = load_data(uploaded_file)
-            st.session_state["raw_df"] = df
-            st.session_state["dataset_source"] = "upload"
-            st.session_state["dataset_name"] = getattr(uploaded_file, "name", "uploaded.csv")
-            st.session_state["dataset_size_bytes"] = getattr(uploaded_file, "size", None)
-        except Exception as exc:
-            st.error(f"Failed to read uploaded file: {exc}")
-            return
-    elif "raw_df" in st.session_state:
-        df = st.session_state["raw_df"]
-
-    if df is not None and not df.empty:
-        _initialize_target_state(df)
-
+def _render_active_section(section: str, df: Optional[pd.DataFrame]) -> None:
     if section == "Upload Data":
         _page_header(
             "Data Overview",
@@ -1214,7 +1295,6 @@ def main() -> None:
                     """
                     <div class='sample-card'>
                         <div>
-                            <div class='sample-icon'>📊</div>
                             <div style='color:#F5F5F5;font-weight:700;font-size:1.05rem;margin-top:0.35rem;'>Sample Dataset</div>
                             <div class='section-note'>Load the bundled online gaming behavior CSV for a fast demo of the full churn workflow.</div>
                         </div>
@@ -1240,7 +1320,7 @@ def main() -> None:
         card(sample_card)
 
         if df is None:
-            _info_banner("Upload a CSV from the sidebar or load the bundled sample dataset to begin.")
+            _info_banner("Upload a CSV from the left control rail or load the bundled sample dataset to begin.")
             return
 
         if df.empty:
@@ -1270,22 +1350,25 @@ def main() -> None:
         with metric_cols[3]:
             _metric_panel("File Size", _format_file_size(dataset_size), note="Current dataset")
 
-        _info_banner(f"Current dataset: {dataset_label} ({dataset_source})", icon="🗂️")
+        _info_banner(f"Current dataset: {dataset_label} ({dataset_source})")
 
         def preview_card() -> None:
             st.markdown("<div class='section-note'>Preview the first 20 rows to confirm feature names and data types.</div>", unsafe_allow_html=True)
             st.dataframe(df.head(20), use_container_width=True)
+
         card(preview_card, title="Raw Dataset Preview")
 
         class_dist = df[target_col].astype(str).value_counts(dropna=False).rename_axis("Class").reset_index(name="Count")
         card(lambda: st.dataframe(class_dist, use_container_width=True), title=f"Class Distribution ({target_col})")
-    elif section == "Model Training":
+        return
+
+    if section == "Model Training":
         _page_header(
             "Model Training",
             "Configure the split, train the decision tree pipeline, and inspect the model metrics in a cleaner workflow.",
         )
         if df is None:
-            _info_banner("Upload data first from the sidebar before training.", icon="📁")
+            _info_banner("Upload data first from the left control rail before training.")
             return
 
         _step_indicator(3)
@@ -1392,13 +1475,15 @@ def main() -> None:
                     _metric_panel("ROC-AUC", f"{metrics['ROC-AUC']:.4f}")
             except Exception as exc:
                 st.error(f"Training failed: {exc}")
-    elif section == "Model Evaluation":
+        return
+
+    if section == "Model Evaluation":
         _page_header(
             "Model Evaluation",
             "Compare performance, inspect risk distributions, and drill into the prediction output with dark-mode analytics cards.",
         )
         if "trained_models" not in st.session_state:
-            _info_banner("Train models first from the Model Training section.", icon="🧠")
+            _info_banner("Train models first from the Model Training section.")
             return
 
         metrics_map = st.session_state["model_metrics"]
@@ -1428,12 +1513,14 @@ def main() -> None:
         eval_left, eval_right = st.columns(2)
         with eval_left:
             cm = cm_map[selected_model]
+
             def confusion_card() -> None:
                 st.markdown("<div class='section-note'>Inspect false positives and false negatives on the test split.</div>", unsafe_allow_html=True)
                 st.plotly_chart(
                     _plotly_confusion_matrix(cm, f"{selected_model} Confusion Matrix"),
                     use_container_width=True,
                 )
+
             card(confusion_card, title="Confusion Matrix")
 
         probabilities = models[selected_model].predict_proba(bundle["X_model"])[:, 1]
@@ -1445,6 +1532,7 @@ def main() -> None:
             def probability_card() -> None:
                 st.markdown("<div class='section-note'>Review how confidently the model separates low- and high-risk players.</div>", unsafe_allow_html=True)
                 st.plotly_chart(_plotly_probability_hist(probability_frame["churn_probability"].to_numpy()), use_container_width=True)
+
             card(probability_card, title="Probability Distribution")
 
         lower_row_left, lower_row_right = st.columns(2)
@@ -1468,6 +1556,7 @@ def main() -> None:
             def risk_card() -> None:
                 st.markdown("<div class='section-note'>Operational view of how many players fall into each risk band.</div>", unsafe_allow_html=True)
                 st.plotly_chart(_plotly_risk_distribution(probability_frame), use_container_width=True)
+
             card(risk_card, title="Risk Distribution")
 
         _page_divider()
@@ -1492,7 +1581,7 @@ def main() -> None:
         if filter_col != "None" and filter_value is not None:
             filtered = filtered[filtered[filter_col].astype(str) == filter_value]
 
-        _info_banner(f"Filtered players available for export: {len(filtered):,}", icon="🎯")
+        _info_banner(f"Filtered players available for export: {len(filtered):,}")
         card(
             lambda: st.dataframe(filtered.sort_values("churn_probability", ascending=False).head(500), use_container_width=True),
             title="Filtered Risk Table",
@@ -1519,13 +1608,15 @@ def main() -> None:
             lambda: st.plotly_chart(_plotly_feature_importance(importance_df), use_container_width=True),
             title="Feature Importance",
         )
-    elif section == "Player Risk Analysis":
+        return
+
+    if section == "Player Risk Analysis":
         _page_header(
             "Player Risk Analysis",
             "Inspect an existing player profile or simulate a new one to understand churn risk at the individual level.",
         )
         if "trained_models" not in st.session_state:
-            _info_banner("Train models first from the Model Training section.", icon="🧠")
+            _info_banner("Train models first from the Model Training section.")
             return
 
         models = st.session_state["trained_models"]
@@ -1538,6 +1629,7 @@ def main() -> None:
             st.markdown("<div class='section-note'>Choose a player from the dataset and score them with the trained model.</div>", unsafe_allow_html=True)
             selected = st.selectbox("Select player row index", options=bundle["X_model"].index.tolist())
             st.session_state["_selected_player_row"] = selected
+
         card(selector_card, title="Existing Player Predictor")
         row_index = st.session_state.get("_selected_player_row", bundle["X_model"].index.tolist()[0])
         card(lambda: st.dataframe(bundle["X_display"].loc[[row_index]], use_container_width=True), title="Player Behavior Snapshot")
@@ -1562,6 +1654,7 @@ def main() -> None:
             return
 
         input_values = {}
+
         def simulator_card() -> None:
             input_cols = st.columns(3)
             for idx, feature in enumerate(numeric_features):
@@ -1572,6 +1665,7 @@ def main() -> None:
                         value=default_value if not np.isnan(default_value) else 0.0,
                         key=f"sim_{feature}",
                     )
+
         card(simulator_card, title="Simulation Inputs")
 
         simulator_row = {}
@@ -1592,13 +1686,15 @@ def main() -> None:
             _metric_panel("Simulated Churn Probability", f"{sim_probability:.4f}", accent=_risk_color(sim_risk))
         with sim_col_2:
             _metric_panel("Simulated Risk Level", sim_risk, note="Behavioral simulation", accent=_risk_color(sim_risk))
-    elif section == "Decision Tree Explorer":
+        return
+
+    if section == "Decision Tree Explorer":
         _page_header(
             "Decision Tree Explorer",
             "Explore the learned decision path visually and inspect the exact split rules behind the churn model.",
         )
         if "trained_models" not in st.session_state:
-            _info_banner("Train models first from the Model Training section.", icon="🧠")
+            _info_banner("Train models first from the Model Training section.")
             return
 
         dt_pipeline = st.session_state["trained_models"]["Decision Tree"]
@@ -1636,18 +1732,21 @@ def main() -> None:
                 "<div class='legend-note'>Legend: darker red nodes indicate stronger churn propensity; follow left/right branches to understand threshold logic.</div>",
                 unsafe_allow_html=True,
             )
+
         card(tree_card, title="Tree Visualization")
 
         split_text = export_text(dt_model, feature_names=feature_names, max_depth=view_depth)
         card(lambda: st.code(split_text), title="Decision Tree Feature Splits")
-    elif section == "Engagement Optimization Assistant":
+        return
+
+    if section == "Engagement Optimization Assistant":
         _page_header(
             "Engagement Optimization Assistant",
             "Generate a retrieval-backed retention report for an individual player with structured recommendations and export options.",
         )
 
         if "trained_models" not in st.session_state:
-            _info_banner("Train a model first from the Model Training section.", icon="🧠")
+            _info_banner("Train a model first from the Model Training section.")
             return
 
         models = st.session_state["trained_models"]
@@ -1672,6 +1771,7 @@ def main() -> None:
                 index=0,
                 key="assistant_presentation_mode",
             )
+
         card(assistant_controls, title="Assistant Control Panel")
 
         selected_model_name = st.session_state["assistant_model"]
@@ -1743,6 +1843,87 @@ def main() -> None:
                 st.markdown("</div>", unsafe_allow_html=True)
             except Exception as exc:
                 st.error(f"Failed to generate report: {exc}")
+        return
+
+
+def main() -> None:
+    st.set_page_config(
+        page_title="ChurnIQ",
+        page_icon=None,
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
+    _inject_global_styles()
+
+    shell_left, shell_right = st.columns([1.15, 4.25], gap="large")
+
+    with shell_left:
+        st.markdown("<div class='shell-nav'>", unsafe_allow_html=True)
+        st.markdown("<div class='nav-wordmark'>ChurnIQ</div>", unsafe_allow_html=True)
+        st.markdown("<div class='nav-subtitle'>Tactical Analytics</div>", unsafe_allow_html=True)
+        st.markdown("<div class='redline'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='panel-label'>Navigation</div>", unsafe_allow_html=True)
+        section = st.radio(
+            "Go to",
+            [
+                "Upload Data",
+                "Model Training",
+                "Model Evaluation",
+                "Player Risk Analysis",
+                "Decision Tree Explorer",
+                "Engagement Optimization Assistant",
+            ],
+            label_visibility="collapsed",
+        )
+        st.markdown("<div class='redline'></div>", unsafe_allow_html=True)
+        st.markdown("<div class='panel-label'>Data Ingest</div>", unsafe_allow_html=True)
+        uploaded_file = st.file_uploader("Upload CSV", type=["csv"], label_visibility="collapsed")
+        if st.button("Use Sample Dataset", type="primary", use_container_width=True, key="sidebar_use_sample_dataset"):
+            try:
+                sample_df = load_sample_data()
+                st.session_state["raw_df"] = sample_df
+                st.session_state["dataset_source"] = "sample"
+                st.session_state["dataset_name"] = SAMPLE_DATASET_PATH.name
+                st.session_state["dataset_size_bytes"] = SAMPLE_DATASET_PATH.stat().st_size
+                st.success("Sample dataset loaded.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Failed to load sample dataset: {exc}")
+        st.markdown("<div class='redline'></div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='panel-label'>System</div><div class='section-note'>Latency: 24ms · Cluster link stable · Tactical mode active</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    df = None
+    if uploaded_file is not None:
+        try:
+            df = load_data(uploaded_file)
+            st.session_state["raw_df"] = df
+            st.session_state["dataset_source"] = "upload"
+            st.session_state["dataset_name"] = getattr(uploaded_file, "name", "uploaded.csv")
+            st.session_state["dataset_size_bytes"] = getattr(uploaded_file, "size", None)
+        except Exception as exc:
+            st.error(f"Failed to read uploaded file: {exc}")
+            return
+    elif "raw_df" in st.session_state:
+        df = st.session_state["raw_df"]
+
+    if df is not None and not df.empty:
+        _initialize_target_state(df)
+
+    with shell_right:
+        st.markdown(
+            """
+            <div class='topbar'>
+                <div class='topbar-search'>Terminal Query...</div>
+                <div class='panel-label' style='margin:0;'>ChurnIQ // Mission Console</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        _render_active_section(section, df)
 
 
 if __name__ == "__main__":
