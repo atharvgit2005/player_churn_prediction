@@ -25,25 +25,25 @@
 
 \begin{document}
 
-\title{Player Churn Prediction Using Streamlit and Machine Learning Pipelines}
+\title{ChurnIQ: Player Churn Prediction Using Streamlit and Machine Learning Pipelines}
 
 \author{
-\IEEEauthorblockN{Atharv Paharia, Khyati Kapil}
+\IEEEauthorblockN{Atharv Paharia, Khyati Kapil, Tanishq}
 \IEEEauthorblockA{Team Name: Player Churn Analytics}
 }
 
 \maketitle
 
 \begin{abstract}
-This project presents an end-to-end player churn prediction system built with Streamlit and classical machine learning models. The pipeline supports robust preprocessing, dynamic target handling, multi-model training, evaluation, feature-importance analysis, risk segmentation, and single-player inference. Three classifiers (Logistic Regression, Random Forest, and Decision Tree) are trained using a unified preprocessing pipeline with imputation, scaling, and one-hot encoding. The app produces standard metrics, confusion matrices, risk-probability distributions, and interpretable model drivers to support retention strategy decisions.
+This project presents an end-to-end player churn prediction system built with Streamlit and classical machine learning models for online gaming analytics. The system supports data upload, robust preprocessing, dynamic target handling, multi-model training, evaluation, feature-importance analysis, risk segmentation, and single-player inference. Three classifiers, namely Logistic Regression, Random Forest, and Decision Tree, are trained through a unified preprocessing pipeline with imputation, scaling, and one-hot encoding. In addition to predictive analytics, the application includes an engagement optimization assistant that summarizes player behavior, interprets churn risk, generates retention recommendations, and exports a structured PDF report. The resulting platform combines predictive performance with usability, interpretability, and deployment readiness for retention-focused decision support.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Player churn, machine learning, Streamlit, classification, feature engineering, model interpretability.
+Player churn, machine learning, Streamlit, classification, feature engineering, model interpretability, engagement optimization.
 \end{IEEEkeywords}
 
 \section{Introduction}
-Player churn directly affects revenue, engagement, and long-term platform growth in online games and digital products. Early identification of high-risk players enables targeted intervention campaigns such as rewards, recommendations, and personalized engagement. The goal of this project is to build an interactive ML application that predicts player churn risk and provides interpretable insights for product and retention teams.
+Player churn directly affects revenue, engagement, and long-term platform growth in online games and digital products. Early identification of high-risk players enables targeted intervention campaigns such as rewards, recommendations, personalized nudges, and re-engagement flows. In practice, teams need more than a single prediction score; they also need interpretable model outputs, player-level drill-down, and an interface that supports operational decisions. The goal of this project is therefore to build an interactive machine learning application that predicts player churn risk and presents the results through a deployable analytics dashboard.
 
 \section{Related Work}
 Customer and player churn prediction is commonly modeled as supervised binary classification, using models such as Logistic Regression, tree-based methods, and ensemble approaches \cite{burez2009churn,verbeke2012new}. Prior work highlights the usefulness of behavioral features and interpretable outputs for operational decisions \cite{huang2012churn}. Our project follows this direction with a practical app-first implementation.
@@ -51,7 +51,7 @@ Customer and player churn prediction is commonly modeled as supervised binary cl
 \section{Methodology}
 
 \subsection{Dataset Description}
-The dataset (\texttt{online\_gaming\_behavior\_dataset.csv}) contains 40,034 player records and 13 features, including demographics, game behavior, and progression signals. The target is \texttt{EngagementLevel}. For churn-style binary modeling, \texttt{Low} engagement is mapped as positive class (churn = 1), while other classes are mapped to non-churn (0).
+The dataset (\texttt{online\_gaming\_behavior\_dataset.csv}) contains 40,034 player records and 13 features, including demographics, gameplay behavior, monetization, and progression signals. Representative attributes include age, game genre, play time hours, in-game purchases, sessions per week, average session duration, player level, and achievement count. The target column is \texttt{EngagementLevel}. For churn-style binary modeling, \texttt{Low} engagement is mapped as the positive class (churn = 1), while the remaining engagement levels are mapped to non-churn (0).
 
 \subsection{Preprocessing}
 The preprocessing stack includes:
@@ -80,7 +80,16 @@ The training module fits three classifiers:
 Class-weight balancing is enabled when class imbalance is detected.
 
 \subsection{Training and Validation}
-Data is split into train/test sets using an 80/20 split with fixed random seed (\texttt{random\_state=42}) and stratification. Evaluation includes Accuracy, Precision, Recall, F1-score, ROC-AUC, confusion matrix visualization, feature-importance plots, and risk distribution analysis.
+Data is split into train and test sets using an 80/20 split with fixed random seed (\texttt{random\_state=42}) and stratification. Evaluation includes Accuracy, Precision, Recall, F1-score, ROC-AUC, confusion matrix visualization, feature-importance plots, and risk distribution analysis. The final application also includes an assistant module that assembles a structured engagement report from model predictions, player attributes, supporting references, and ethical disclaimers before allowing PDF export.
+
+\subsection{System Interface}
+The machine learning pipeline is exposed through a multi-section Streamlit dashboard named \textit{ChurnIQ}. The major interface modules are Data Overview, Model Training, Model Evaluation, Player Risk Analysis, Decision Tree Explorer, and the Engagement Optimization Assistant. The final interface follows a dark analytics dashboard style and is designed to preserve model functionality while improving readability, workflow clarity, and report exportability. Visual refinements were implemented without changing model logic, session-state handling, or preprocessing behavior.
+
+\subsection{Assistant Reporting and Validation}
+The Engagement Optimization Assistant extends the predictive workflow from classification to action-oriented reporting. For a selected player, the assistant compiles a report containing six mandatory sections: title block, player behavior summary, churn risk interpretation, engagement and retention recommendations, supporting references, and ethical or user-experience disclaimers. Before PDF generation, a validation layer checks that every required section is present and non-empty. If any section is missing, export is blocked and the user is shown an explicit error message listing the incomplete sections. This design prevents incomplete or misleading reports from being generated.
+
+\subsection{Testing and Reliability}
+To preserve existing functionality while adding report export features, automated tests were added using \texttt{pytest}. These tests verify schema completeness for generated reports, graceful handling of missing or noisy player data, successful PDF generation, and the presence of at least one reference entry in both the structured output and exported PDF. This testing layer improves reliability and makes the application more suitable for reproducible academic demonstration.
 
 \section{Results}
 
@@ -94,7 +103,7 @@ Model & Acc & Prec & Rec & F1 & ROC-AUC \\
 \midrule
 Logistic Regression & 0.840 & 0.634 & 0.897 & 0.743 & 0.926 \\
 Random Forest & \textbf{0.950} & \textbf{0.914} & \textbf{0.890} & \textbf{0.902} & \textbf{0.938} \\
-Decision Tree & 0.913 & 0.798 & 0.889 & 0.841 & 0.931 \\
+Decision Tree & 0.947 & 0.897 & 0.893 & 0.895 & 0.997 \\
 \bottomrule
 \end{tabular}
 \label{tab:model_performance}
@@ -103,20 +112,41 @@ Decision Tree & 0.913 & 0.798 & 0.889 & 0.841 & 0.931 \\
 \subsection{Figures}
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.45\textwidth]{figures/rf_confusion_matrix.png}
-\caption{Random Forest confusion matrix on test data.}
-\label{fig:rf_confusion}
+\includegraphics[width=0.45\textwidth]{figures/dt_confusion_matrix.png}
+\caption{Decision Tree confusion matrix on test data.}
+\label{fig:dt_confusion}
 \end{figure}
 
 \begin{figure}[ht]
 \centering
-\includegraphics[width=0.45\textwidth]{figures/rf_risk_distribution.png}
-\caption{Random Forest churn-probability and risk-bucket distribution.}
-\label{fig:rf_risk_distribution}
+\includegraphics[width=0.45\textwidth]{figures/churn_probability_distribution.png}
+\caption{Predicted churn-probability distribution from the evaluation workflow.}
+\label{fig:probability_distribution}
 \end{figure}
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.45\textwidth]{figures/roc_curve.png}
+\caption{ROC curve exported from the model evaluation module.}
+\label{fig:roc_curve}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.45\textwidth]{figures/risk_bucket_distribution.png}
+\caption{Distribution of player risk buckets across the evaluated dataset.}
+\label{fig:risk_bucket_distribution}
+\end{figure}
+
+\subsection{System-Level Outcome}
+The final system is not limited to offline model comparison. It supports a complete user workflow consisting of dataset upload, preprocessing, model training, evaluation, player-level risk inspection, decision-tree exploration, assistant-driven recommendation generation, and PDF export. As a result, the project functions both as a machine learning experiment and as a lightweight decision-support application for gaming analytics.
+
 \section{Discussion}
-Random Forest achieved the best overall performance, with strong balance across precision and recall and the highest F1 and ROC-AUC scores. Logistic Regression produced high recall but lower precision, indicating more false positives. Decision Tree performed competitively but below Random Forest on all major metrics. Limitations include dependence on a single dataset and binary mapping from multi-class engagement labels; future work can include cross-validation, hyperparameter tuning, and temporal validation.
+Random Forest achieved the strongest overall balance across the earlier comparison metrics, particularly in accuracy, precision, and F1-score. The final exported Decision Tree evaluation also produced strong results, with an accuracy of 0.947, F1-score of 0.895, and ROC-AUC of 0.997, showing that it remains highly competitive while offering superior interpretability. Logistic Regression produced high recall but lower precision, indicating more false positives and therefore a higher false-alarm rate for retention interventions. Decision Tree remains especially valuable from an interpretability perspective because its behavior can be explained through explicit decision rules and visual tree analysis.
+
+Beyond model quality, the project emphasizes practical usage. The dashboard supports data upload, model comparison, player-level analysis, and assistant-generated retention reporting in a single workflow. This improves the operational usefulness of the system because a retention or product team can move from raw data inspection to actionable recommendations without leaving the application. The PDF export layer further strengthens reproducibility by packaging behavior summary, risk interpretation, recommendations, references, and ethical disclaimers into a portable report. The redesigned interface also improves presentation quality and usability, which is valuable in academic demonstrations where system flow and interpretability matter alongside raw model performance.
+
+The project still has limitations. It is currently evaluated on a single dataset, the binary target is derived from an engagement label rather than direct historical churn labels, and the reported results are based on one train-test split. Future work can include k-fold cross-validation, hyperparameter tuning, temporal holdout validation, calibration analysis for predicted probabilities, and richer recommendation logic driven by domain-specific retention experiments.
 
 \section{Conclusion}
 This project delivers a practical churn prediction framework with:
@@ -126,8 +156,10 @@ This project delivers a practical churn prediction framework with:
     \item Feature-importance-based driver interpretation
     \item Risk segmentation and probability visual analytics
     \item Single-player prediction with UI risk badge rendering
+    \item Engagement assistant with structured PDF export
+    \item Validation and automated testing for report reliability
 \end{itemize}
-The system is suitable for rapid experimentation and retention-focused decision support in gaming analytics.
+The system is suitable for rapid experimentation and retention-focused decision support in gaming analytics. By combining machine learning pipelines with an interactive user interface and report-generation capabilities, the project demonstrates how predictive models can be translated into practical decision-support tools for player engagement management.
 
 \bibliographystyle{IEEEtranN}
 \bibliography{references}
@@ -143,18 +175,39 @@ The system is suitable for rapid experimentation and retention-focused decision 
 \subsection{Repository Structure}
 \begin{lstlisting}[language=bash,caption={Current project structure}]
 player_churn_prediction/
+|- .gitignore
+|- README.md
 |- app.py
+|- online_gaming_behavior_dataset.csv
+|- references.bib
+|- report.tex
 |- requirements.txt
+|- engagement_assistant/
+|  |- engine.py
+|  |- export.py
+|  |- retrieval.py
+|  |- schema.py
+|  |- state.py
+|  |- knowledge_base.jsonl
 |- figures/
-|  |- rf_confusion_matrix.png
-|  |- rf_risk_distribution.png
+|  |- dt_confusion_matrix.png
+|  |- churn_probability_distribution.png
+|  |- roc_curve.png
+|  |- risk_bucket_distribution.png
+|- tests/
+|  |- conftest.py
+|  |- test_engagement_report_export.py
 \end{lstlisting}
 
 \subsection{Description of Key Components}
 \begin{itemize}
-    \item \textbf{app.py}: Streamlit application with preprocessing, training, evaluation, visualization, and inference utilities.
+    \item \textbf{app.py}: Main Streamlit application with data ingestion, navigation, training, evaluation, visualization, and player-level analytics.
+    \item \textbf{online\_gaming\_behavior\_dataset.csv}: Dataset used for experimentation and demonstration.
+    \item \textbf{engagement\_assistant/}: Assistant modules for report construction, retrieval, export, and state handling.
+    \item \textbf{tests/}: Automated tests for assistant report validation and PDF generation.
     \item \textbf{requirements.txt}: Python dependencies for reproducible deployment.
-    \item \textbf{figures/}: Exported evaluation artifacts used in this report.
+    \item \textbf{figures/}: Exported evaluation artifacts used in this report, including confusion matrix, probability distribution, ROC curve, and risk-bucket distribution plots.
+    \item \textbf{report.tex} and \textbf{references.bib}: Source files for the academic report and bibliography.
 \end{itemize}
 
 \end{document}
