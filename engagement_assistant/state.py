@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 class AgentStep(str, Enum):
     INGEST = "INGEST"
     ANALYZE = "ANALYZE"
+    RETRIEVE = "RETRIEVE"
     RECOMMEND = "RECOMMEND"
     FINALIZE = "FINALIZE"
 
@@ -35,8 +36,14 @@ class AgentState:
     player_features: Dict[str, Any] = field(default_factory=dict)
 
     # Derived / intermediate
+    analysis_summary: Dict[str, Any] = field(default_factory=dict)
     engagement_profile: Dict[str, Any] = field(default_factory=dict)
+    retrieved_strategies: List[Dict[str, Any]] = field(default_factory=list)
+    recommendation_drafts: List[Dict[str, Any]] = field(default_factory=list)
     data_quality_notes: List[str] = field(default_factory=list)
+
+    # Execution metadata
+    workflow_mode: str = "retrieval"
 
     def log(self, message: str, details: Optional[Dict[str, Any]] = None) -> None:
         self.events.append(
@@ -47,4 +54,3 @@ class AgentState:
                 details=details,
             )
         )
-

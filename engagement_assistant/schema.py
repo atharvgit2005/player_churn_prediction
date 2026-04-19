@@ -4,14 +4,12 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from .retrieval import RetrievedStrategy
+
 
 @dataclass(frozen=True)
 class Reference:
-    """A human-readable reference that supports a recommendation.
-
-    Commit 1 ships with lightweight "internal" references.
-    Commit 2 will add a proper retrieval-backed knowledge base.
-    """
+    """A human-readable reference that supports a recommendation."""
 
     title: str
     source: str
@@ -28,6 +26,10 @@ class Recommendation:
     risk: str
     metrics_to_track: List[str] = field(default_factory=list)
     references: List[Reference] = field(default_factory=list)
+    supporting_signals: List[str] = field(default_factory=list)
+    action_steps: List[str] = field(default_factory=list)
+    confidence: Optional[float] = None
+    uncertainty_notes: List[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -42,6 +44,9 @@ class EngagementOptimizationReport:
     supporting_references: List[Reference]
     ethical_and_ux_disclaimers: List[str]
     data_quality_notes: List[str] = field(default_factory=list)
+    analysis_summary: Dict[str, Any] = field(default_factory=dict)
+    retrieved_strategies: List[RetrievedStrategy] = field(default_factory=list)
+    workflow_mode: str = "retrieval"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -49,4 +54,3 @@ class EngagementOptimizationReport:
     @staticmethod
     def now_utc_iso() -> str:
         return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-
