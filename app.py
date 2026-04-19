@@ -1,5 +1,6 @@
 import warnings
 import json
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
@@ -28,6 +29,7 @@ from engagement_assistant import generate_engagement_optimization_report
 
 warnings.filterwarnings("ignore")
 RANDOM_STATE = 42
+SAMPLE_DATASET_PATH = Path(__file__).with_name("online_gaming_behavior_dataset.csv")
 
 
 def _find_column_case_insensitive(df: pd.DataFrame, target_name: str) -> Optional[str]:
@@ -70,6 +72,12 @@ def _risk_color(risk_level: str) -> str:
 
 def load_data(uploaded_file) -> pd.DataFrame:
     return pd.read_csv(uploaded_file)
+
+
+def load_sample_data() -> pd.DataFrame:
+    if not SAMPLE_DATASET_PATH.exists():
+        raise FileNotFoundError(f"Sample dataset not found at {SAMPLE_DATASET_PATH}")
+    return pd.read_csv(SAMPLE_DATASET_PATH)
 
 
 def preprocess_data(
@@ -713,6 +721,8 @@ def main() -> None:
         try:
             df = load_data(uploaded_file)
             st.session_state["raw_df"] = df
+            st.session_state["dataset_source"] = "upload"
+            st.session_state["dataset_name"] = getattr(uploaded_file, "name", "uploaded.csv")
         except Exception as exc:
             st.error(f"Failed to read uploaded file: {exc}")
             return
@@ -725,13 +735,36 @@ def main() -> None:
     if section == "Upload Data":
         st.subheader("Data Overview")
 
+        with st.container(border=True):
+            sample_cols = st.columns([3, 1])
+            with sample_cols[0]:
+                st.markdown("**Sample Dataset**")
+                st.caption("Load the bundled gaming behavior dataset with one click. This uses the same CSV provided in your Downloads folder.")
+                if SAMPLE_DATASET_PATH.exists():
+                    st.caption(f"Source: `{SAMPLE_DATASET_PATH.name}`")
+            with sample_cols[1]:
+                if st.button("Use Sample Dataset", type="primary", use_container_width=True, key="use_sample_dataset"):
+                    try:
+                        sample_df = load_sample_data()
+                        st.session_state["raw_df"] = sample_df
+                        st.session_state["dataset_source"] = "sample"
+                        st.session_state["dataset_name"] = SAMPLE_DATASET_PATH.name
+                        st.success("Sample dataset loaded.")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Failed to load sample dataset: {exc}")
+
         if df is None:
-            st.info("Upload a CSV file from the sidebar to begin.")
+            st.info("Upload a CSV file from the sidebar or click 'Use Sample Dataset' to begin.")
             return
 
         if df.empty:
             st.error("The uploaded CSV is empty.")
             return
+
+        dataset_label = st.session_state.get("dataset_name", "Uploaded CSV")
+        dataset_source = st.session_state.get("dataset_source", "upload")
+        st.caption(f"Current dataset: `{dataset_label}` ({dataset_source})")
 
         st.write("Raw Dataset Preview")
         st.dataframe(df.head(20), use_container_width=True)
